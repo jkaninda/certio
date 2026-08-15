@@ -1,0 +1,45 @@
+# Build output
+/bin/
+/dist/
+coverage.out
+coverage.html
+
+# The dashboard is built into here and embedded; the placeholder is tracked.
+/cmd/certio/dist/*
+!/cmd/certio/dist/.gitkeep
+
+# Frontend
+/web/node_modules/
+/web/.nuxt/
+/web/.output/
+/web/.data/
+
+# Runtime state — a committed database would leak private key material,
+# encrypted or not.
+*.db
+*.db-wal
+*.db-shm
+certio-backup-*.tar.gz
+
+# Secrets
+/secrets/
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+!examples/**/*.example
+
+# Local configuration
+/certio.yaml
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+.history

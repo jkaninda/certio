@@ -1,0 +1,68 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - bodyclose
+    - errcheck
+    - errorlint
+    - goconst
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+
+  settings:
+    revive:
+      rules:
+        - name: exported
+          arguments: [checkPrivateReceivers]
+    goconst:
+      min-len: 4
+      min-occurrences: 4
+      # Wire-format keys: JSON field names, Slack Block Kit keys, sort keys and
+      # log attributes. They repeat because the formats repeat them, not
+      # because they are one shared concept — a constant would tie together
+      # things that are free to diverge.
+      ignore-string-values:
+        - '^(text|type|not_after|serial_number|reason|rsa-2048)$'
+    gocritic:
+      enabled-tags: [diagnostic, style, performance]
+      disabled-checks:
+        # Certio prefers named early returns over inverted conditions in the
+        # PKI code, where each guard documents a distinct failure mode.
+        - ifElseChain
+        # Audit actors, notification events and DTOs are passed by value on
+        # purpose: the audit trail must not be able to observe a mutation made
+        # after the call. Copying a few dozen bytes is the price of that, and
+        # it is not on any hot path.
+        - hugeParam
+        - rangeValCopy
+    # G401/G505 (SHA-1) are not excluded globally: every use — RFC 5280 key
+    # identifiers, the fingerprints every other tool prints, and the HMAC
+    # RFC 6238 fixes for TOTP — carries its own //nolint with the reason, so a
+    # new one has to be justified rather than inherit a blanket exemption.
+
+  exclusions:
+    rules:
+      # Tests may hard-code credentials and skip error checks on cleanup.
+      - path: _test\.go
+        linters: [gosec, errcheck, goconst, unparam]
+
+formatters:
+  enable:
+    - gofmt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -1,0 +1,105 @@
+# GoReleaser builds the tagged release: cross-compiled binaries, archives,
+# checksums and the GitHub release itself. The container image is built
+# separately in .github/workflows/release.yml, because that image compiles the
+# dashboard and the binary inside the Dockerfile.
+#
+# Try it without publishing anything:
+#   make snapshot
+version: 2
+
+project_name: certio
+
+before:
+  hooks:
+    - go mod download
+    # The dashboard is embedded with //go:embed, so it has to exist before the
+    # first target is compiled. `make deps` must have run at least once.
+    - make ui
+
+builds:
+  - id: certio
+    main: ./cmd/certio
+    binary: certio
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X main.date={{ .CommitDate }}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Windows on ARM is not a platform this has ever been asked for; drop it
+      # rather than publish an artifact nobody has run.
+      - goos: windows
+        goarch: arm64
+    # Stamp the binary with the commit time rather than the build time, so
+    # rebuilding the same tag produces byte-identical output.
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - id: certio
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE
+      - examples/certio.yaml
+      - examples/docker-compose.yml
+
+checksum:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: '{{ incpatch .Version }}-next'
+
+changelog:
+  use: github
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^feat(\(.+\))?!?:'
+      order: 0
+    - title: Fixes
+      regexp: '^fix(\(.+\))?!?:'
+      order: 1
+    - title: Security
+      regexp: '^sec(urity)?(\(.+\))?!?:'
+      order: 2
+    - title: Other
+      order: 99
+  filters:
+    exclude:
+      - '^docs(\(.+\))?:'
+      - '^test(\(.+\))?:'
+      - '^chore(\(.+\))?:'
+      - '^ci(\(.+\))?:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  # A tag carrying a pre-release suffix (-rc.1, -beta.1) is published as a
+  # pre-release, which keeps it off the "latest release" the README links to.
+  prerelease: auto
+  name_template: '{{ .Tag }}'
+  footer: |
+    ## Container image
+
+    ```sh
+    docker pull jkaninda/certio:{{ .Version }}
+    ```
+
+    The master key is not in any artifact here. Generate one with
+    `certio keygen` and keep it somewhere other than the database volume.

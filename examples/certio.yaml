@@ -1,0 +1,140 @@
+# Certio configuration.
+#
+# Every value here can also be set as an environment variable with a CERTIO_
+# prefix, and the environment always wins. Secrets belong in the environment
+# or in a *_file entry — not in this file.
+#
+#   certio serve --config certio.yaml
+
+# Refuse to boot without a real master key and JWT secret. Leave this false
+# only for local development, where an ephemeral key is generated per run.
+production: false
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+  # The externally reachable root. This is baked into the CRL distribution
+  # point of every certificate issued from now on, so it must be the URL
+  # clients can actually resolve — not localhost.
+  base_url: http://localhost:8080
+
+  read_timeout: 30
+  write_timeout: 60
+  idle_timeout: 120
+
+  cors_origins:
+    - "*"
+
+  # Serves the OpenAPI document and the Scalar UI at /docs.
+  enable_docs: true
+
+  # Terminating TLS here is optional; a reverse proxy in front is just as good.
+  # tls_cert: /etc/certio/tls/server.crt
+  # tls_key: /etc/certio/tls/server.key
+
+database:
+  # sqlite is the single-binary story; postgres exists for the deployment that
+  # wants managed backups or more than one instance in front of one database.
+  driver: sqlite
+  path: certio.db
+  # For postgres, set the DSN instead of the path:
+  # driver: postgres
+  # dsn: postgres://certio:secret@localhost:5432/certio?sslmode=require
+
+security:
+  # Encrypts every stored private key. Generate with `certio keygen`.
+  # Prefer master_key_file so the value never appears in a process listing.
+  # master_key: ""
+  # master_key_file: /run/secrets/master_key
+
+  # jwt_secret: ""
+  # jwt_secret_file: /run/secrets/jwt_secret
+
+  jwt_issuer: certio
+  # There is no token denylist, so this is what bounds a leaked session.
+  access_token_ttl: 1h
+  refresh_token_ttl: 168h
+
+  # once   — each private key may be downloaded exactly once
+  # always — no limit
+  # never  — private keys are never exposed through the API
+  key_download_policy: always
+
+  # Applied to /auth/login only.
+  login_rate_limit: 10
+  login_rate_window: 1m
+
+  # Issuance is the one authenticated operation that costs real CPU and leaves
+  # a permanent row behind, so it gets a budget of its own. Keyed by principal
+  # rather than by IP: a runaway CI token should be throttled even when it
+  # shares an egress address with everyone else. Zero disables the limit.
+  issue_rate_limit: 60
+  issue_rate_window: 1m
+
+admin:
+  # Creates the first administrator on an empty database. Ignored once any
+  # account exists, so restarting never resets credentials.
+  email: ""
+  password: ""
+  name: Administrator
+
+scheduler:
+  enabled: true
+  # How often to rescan for expiring certificates and run auto-renewal.
+  interval: 1h
+  # How often to republish every CA's revocation list.
+  crl_interval: 24h
+  # Certificates inside this window are marked "expiring" and trigger
+  # notifications.
+  expiry_warn_days: 30
+
+log:
+  level: info      # debug | info | warning | error | off
+  format: text     # text | json
+  # file: /var/log/certio/certio.log
+  caller: false
+
+pki:
+  default_organization: ""
+  default_country: ""
+  default_key_algorithm: ecdsa-p256
+  # 397 days is the CA/Browser Forum maximum for public certificates. A private
+  # CA may exceed it, but staying inside keeps habits portable.
+  default_validity_days: 397
+  default_ca_validity_days: 3650
+  crl_validity: 168h
+
+acme:
+  # An RFC 8555 server, so cert-manager, Traefik, Caddy, certbot and acme.sh can
+  # renew internal certificates with nobody in the loop. Off by default: turning
+  # it on is a decision, not a default.
+  enabled: false
+
+  # The CA that signs ACME orders, by ID or slug. Pointing this at a
+  # name-constrained intermediate is the arrangement that makes unattended
+  # issuance safe.
+  authority: ""
+
+  # Short is correct here — the whole point is that renewal is automatic.
+  validity_days: 90
+
+  # Requires an administrator-issued credential to register at all. Leaving this
+  # on is what stops any host on the network from minting certificates:
+  # Let's Encrypt can be open because it validates against the public DNS, and a
+  # private CA validating internal names has no such backstop.
+  require_eab: true
+
+  http01_enabled: true
+  dns01_enabled: true
+
+  # RFC 8555 fixes http-01 at port 80. A segmented private network sometimes
+  # cannot offer that.
+  http01_port: 80
+
+  # The resolver used for dns-01, e.g. "10.0.0.53:53". Empty uses the system
+  # one — which on a private network often cannot see the names being validated.
+  resolver: ""
+
+  terms_url: ""
+  website_url: ""

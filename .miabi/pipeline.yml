@@ -1,0 +1,15 @@
+apiVersion: miabi.io/v1
+kind: Pipeline
+metadata: { name: certio }
+on:
+  push: { branches: [main] }
+steps:
+  - name: build
+    uses: build
+    dockerfile: docker/Dockerfile
+  - name: scan
+    image: aquasec/trivy:latest
+    continue-on-error: true
+    run: "TRIVY_USERNAME=$MIABI_REGISTRY_USER TRIVY_PASSWORD=$MIABI_REGISTRY_TOKEN trivy image --exit-code 1 --severity HIGH,CRITICAL $MIABI_IMAGE"
+  - name: deploy
+    uses: deploy

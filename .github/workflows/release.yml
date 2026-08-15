@@ -1,0 +1,130 @@
+name: Release
+on:
+  push:
+    tags:
+      - v0.**
+jobs:
+  binaries:
+    name: Binaries and GitHub release
+    runs-on: ubuntu-latest
+    permissions:
+      # goreleaser creates the release and uploads the archives to it.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # goreleaser builds the changelog from the log, which a shallow
+          # clone does not have.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26'
+          cache: true
+
+      # The dashboard is embedded in the binary, so it is built before
+      # goreleaser compiles anything — the `make ui` hook in .goreleaser.yaml
+      # needs the packages installed here.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dashboard packages
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: '~> v2'
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker:
+    if: "!contains(github.ref, '-rc')"
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Get the tag name
+        id: get_tag_name
+        run: |
+          # Extract tag name and remove "v" if present
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(date)" >> "$GITHUB_ENV"
+      -
+        name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          push: true
+          file: "./docker/Dockerfile"
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            BUILD_DATE=${{ env.BUILD_TIME }}
+            COMMIT=${{ github.sha }}
+          tags: |
+            "${{vars.BUILDKIT_IMAGE}}:${{ env.VERSION }}"
+            "${{vars.BUILDKIT_IMAGE}}:latest"
+
+
+  docker-rc:
+    if: "contains(github.ref, '-rc')"
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      -
+        name: Login to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Get the tag name
+        id: get_tag_name
+        run: |
+          # Extract tag name and remove "v" if present
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "BUILD_TIME=$(date)" >> "$GITHUB_ENV"
+      -
+        name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          push: true
+          file: "./docker/Dockerfile"
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ env.VERSION }}
+            BUILD_DATE=${{ env.BUILD_TIME }}
+            COMMIT=${{ github.sha }}
+          tags: |
+            "${{vars.BUILDKIT_IMAGE}}:${{ env.VERSION }}"
+            "${{vars.BUILDKIT_IMAGE}}:rc"
