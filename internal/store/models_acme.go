@@ -68,9 +68,9 @@ type ACMEExternalAccount struct {
 
 	// HMACEncrypted is the shared secret, sealed with the master key. The
 	// plaintext is shown to the administrator exactly once.
-	HMACEncrypted []byte `gorm:"type:blob" json:"-"`
-	HMACNonce     []byte `gorm:"type:blob" json:"-"`
-	HMACSalt      []byte `gorm:"type:blob" json:"-"`
+	HMACEncrypted []byte `json:"-"`
+	HMACNonce     []byte `json:"-"`
+	HMACSalt      []byte `json:"-"`
 
 	// AllowedDomains restricts what accounts bound with this credential may
 	// request. Empty means whatever the CA's own name constraints allow.

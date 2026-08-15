@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jkaninda/certio/internal/app"
+	"github.com/jkaninda/certio/internal/config"
 	certiocrypto "github.com/jkaninda/certio/internal/crypto"
 	"github.com/spf13/cobra"
 )
@@ -127,7 +128,12 @@ func newMigrateCmd() *cobra.Command {
 			if err := instance.Migrate(); err != nil {
 				return err
 			}
-			cmd.Printf("schema is up to date (%s)\n", instance.Config.Database.Path)
+
+			target := instance.Config.Database.Driver
+			if target == "" || target == config.DriverSQLite {
+				target = instance.Config.Database.Path
+			}
+			cmd.Printf("schema is up to date (%s)\n", target)
 			return nil
 		},
 	}

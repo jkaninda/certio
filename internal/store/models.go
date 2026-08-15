@@ -115,9 +115,9 @@ type Authority struct {
 	NameConstraints JSONField[pki.NameConstraints] `gorm:"column:name_constraints;type:text" json:"name_constraints"`
 
 	CertPEM      string `gorm:"type:text;not null" json:"-"`
-	KeyEncrypted []byte `gorm:"type:blob" json:"-"`
-	KeyNonce     []byte `gorm:"type:blob" json:"-"`
-	KeySalt      []byte `gorm:"type:blob" json:"-"`
+	KeyEncrypted []byte `json:"-"`
+	KeyNonce     []byte `json:"-"`
+	KeySalt      []byte `json:"-"`
 	// PassphraseProtected means the key needs an operator-supplied passphrase
 	// at signing time. The passphrase itself is never stored.
 	PassphraseProtected bool `json:"passphrase_protected"`
@@ -178,9 +178,9 @@ type Certificate struct {
 	ValidityDays int       `json:"validity_days"`
 
 	CertPEM      string `gorm:"type:text;not null" json:"-"`
-	KeyEncrypted []byte `gorm:"type:blob" json:"-"`
-	KeyNonce     []byte `gorm:"type:blob" json:"-"`
-	KeySalt      []byte `gorm:"type:blob" json:"-"`
+	KeyEncrypted []byte `json:"-"`
+	KeyNonce     []byte `json:"-"`
+	KeySalt      []byte `json:"-"`
 	// CSRPEM is set only for the BYO-CSR flow, where Certio never held the key.
 	CSRPEM string `gorm:"column:csr_pem;type:text" json:"-"`
 
@@ -284,9 +284,9 @@ type User struct {
 	// right value for both a new row and an existing one, and SQLite refuses
 	// to add a NOT NULL column to a populated table without it.
 	TOTPEnabled         bool   `gorm:"not null;default:false" json:"totp_enabled"`
-	TOTPSecretEncrypted []byte `gorm:"type:blob" json:"-"`
-	TOTPSecretNonce     []byte `gorm:"type:blob" json:"-"`
-	TOTPSecretSalt      []byte `gorm:"type:blob" json:"-"`
+	TOTPSecretEncrypted []byte `json:"-"`
+	TOTPSecretNonce     []byte `json:"-"`
+	TOTPSecretSalt      []byte `json:"-"`
 	// TOTPEnabledAt is when the enrolment was confirmed, not when it started.
 	TOTPEnabledAt *time.Time `json:"totp_enabled_at,omitempty"`
 	// TOTPLastStep is the newest time step already spent. A code is valid for
@@ -411,9 +411,9 @@ type Notification struct {
 
 	// ConfigEncrypted holds channel settings — webhook URLs, SMTP passwords —
 	// sealed with the master key.
-	ConfigEncrypted []byte `gorm:"type:blob" json:"-"`
-	ConfigNonce     []byte `gorm:"type:blob" json:"-"`
-	ConfigSalt      []byte `gorm:"type:blob" json:"-"`
+	ConfigEncrypted []byte `json:"-"`
+	ConfigNonce     []byte `json:"-"`
+	ConfigSalt      []byte `json:"-"`
 
 	Events JSONField[[]string] `gorm:"column:events;type:text" json:"events"`
 	// No column default, for the same reason as AuditLog.Success: it would
@@ -484,9 +484,9 @@ type DeploymentTarget struct {
 
 	// ConfigEncrypted holds the target's settings — SSH keys, cluster tokens —
 	// sealed with the master key.
-	ConfigEncrypted []byte `gorm:"type:blob" json:"-"`
-	ConfigNonce     []byte `gorm:"type:blob" json:"-"`
-	ConfigSalt      []byte `gorm:"type:blob" json:"-"`
+	ConfigEncrypted []byte `json:"-"`
+	ConfigNonce     []byte `json:"-"`
+	ConfigSalt      []byte `json:"-"`
 
 	// Selector matches certificates by label. Empty matches nothing: a target
 	// that silently deployed every certificate in the instance would be a
@@ -566,9 +566,9 @@ func (j *Job) Duration() time.Duration {
 type Setting struct {
 	Key            string    `gorm:"primaryKey;size:64" json:"key"`
 	Value          string    `gorm:"type:text" json:"value"`
-	ValueEncrypted []byte    `gorm:"type:blob" json:"-"`
-	ValueNonce     []byte    `gorm:"type:blob" json:"-"`
-	ValueSalt      []byte    `gorm:"type:blob" json:"-"`
+	ValueEncrypted []byte    `json:"-"`
+	ValueNonce     []byte    `json:"-"`
+	ValueSalt      []byte    `json:"-"`
 	Secret         bool      `gorm:"default:false" json:"secret"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
