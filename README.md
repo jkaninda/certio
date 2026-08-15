@@ -7,7 +7,7 @@
 <p align="center">
   <a href="https://github.com/jkaninda/certio/actions/workflows/ci.yml"><img src="https://github.com/jkaninda/certio/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/github/go-mod/go-version/jkaninda/certio" alt="Go" /></a>
-  <a href="https://pkg.go.dev/github.com/miabi-io/miabi"><img src="https://pkg.go.dev/badge/github.com/miabi-io/miabi.svg" alt="Go Reference" /></a>
+  <a href="https://pkg.go.dev/github.com/jkaninda/certio"><img src="https://pkg.go.dev/badge/github.com/jkaninda/certio.svg" alt="Go Reference" /></a>
   <a href="https://github.com/jkaninda/certio/releases"><img src="https://img.shields.io/github/v/release/jkaninda/certio" alt="GitHub Release" /></a>
   <a href="./LICENSE"><img src="https://img.shields.io/github/license/jkaninda/certio" alt="License" />
   </a>
