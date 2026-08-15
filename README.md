@@ -4,6 +4,18 @@
     <img src="branding/certio-logo-horizontal.svg" alt="Certio" width="281" height="100">
   </picture>
 </p>
+<p align="center">
+  <a href="https://github.com/jkaninda/certio/actions/workflows/ci.yml"><img src="https://github.com/jkaninda/certio/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/github/go-mod/go-version/jkaninda/certio" alt="Go" /></a>
+  <a href="https://pkg.go.dev/github.com/jkaninda/certio"><img src="https://pkg.go.dev/badge/github.com/jkaninda/certio.svg" alt="Go Reference" /></a>
+  <a href="https://github.com/jkaninda/certio/releases"><img src="https://img.shields.io/github/v/release/jkaninda/certio" alt="GitHub Release" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/jkaninda/certio" alt="License" />
+  </a>
+  <img src="https://img.shields.io/docker/pulls/jkaninda/certio?style=flat-square" alt="Docker Pulls" />
+  <a href="https://marketplace.miabi.io/templates/certio">
+  <img src="https://miabi.io/badge.svg?style=flat-square&label=deploy&color=dark" alt="Deploy on Miabi" />
+  </a>
+</p>
 
 **Self-signed PKI and TLS certificate management, in a single binary.**
 
