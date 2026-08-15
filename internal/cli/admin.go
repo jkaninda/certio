@@ -408,7 +408,7 @@ func addFileToTar(tw *tar.Writer, path string, info os.FileInfo) error {
 const maxRestoreBytes = 8 << 30
 
 func extractBackup(archivePath, dst string) error {
-	file, err := os.Open(archivePath)
+	file, err := os.Open(archivePath) //nolint:gosec // G304: the operator names the archive to restore
 	if err != nil {
 		return err
 	}

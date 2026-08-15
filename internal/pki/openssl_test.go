@@ -23,7 +23,15 @@ func opensslPath(t *testing.T) string {
 	return path
 }
 
-// runOpenssl runs openssl with the given arguments and returns stdout.
+// runOpenssl runs openssl with the given arguments and returns everything it
+// wrote, both streams joined.
+//
+// Both, because openssl splits its output between them differently per build:
+// OpenSSL 3.x prints "Certificate request self-signature verify OK" on stdout,
+// while LibreSSL — which is what /usr/bin/openssl is on macOS — prints
+// "verify OK" on stderr and leaves stdout to the -text dump alone. Reading only
+// stdout made these tests pass against one openssl on PATH and fail against
+// another, on the same signature, which is the opposite of a cross-check.
 func runOpenssl(t *testing.T, stdin []byte, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(opensslPath(t), args...)
@@ -35,7 +43,7 @@ func runOpenssl(t *testing.T, stdin []byte, args ...string) string {
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("openssl %s: %v\n%s", strings.Join(args, " "), err, stderr.String())
 	}
-	return stdout.String()
+	return stdout.String() + stderr.String()
 }
 
 // normalizeDN collapses the two ways openssl renders distinguished names.
@@ -203,12 +211,13 @@ func TestCertioReadsOpensslOutput(t *testing.T) {
 	keyPath := filepath.Join(dir, "ca.key")
 	certPath := filepath.Join(dir, "ca.crt")
 
-	// The exact recipe from this repo's README.
 	runOpenssl(t, nil, "genpkey", "-algorithm", "RSA",
 		"-pkeyopt", "rsa_keygen_bits:2048", "-out", keyPath)
 	runOpenssl(t, nil, "req", "-x509", "-new", "-nodes",
 		"-key", keyPath, "-sha256", "-days", "1825", "-out", certPath,
-		"-subj", "/C=CD/ST=Kinshasa/L=Gombe/O=jkanTech/CN=jkanTech CA")
+		"-subj", "/C=CD/ST=Kinshasa/L=Gombe/O=jkanTech/CN=jkanTech CA",
+		"-addext", "basicConstraints=critical,CA:TRUE",
+		"-addext", "keyUsage=critical,keyCertSign,cRLSign")
 
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
