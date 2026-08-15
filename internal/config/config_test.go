@@ -142,12 +142,73 @@ func TestUnparseableValuesFallBack(t *testing.T) {
 	}
 }
 
+// TestDatabaseURLPicksTheDriver covers the single-value form: one URL decides
+// the driver and the connection string, in every spelling operators write.
+func TestDatabaseURLPicksTheDriver(t *testing.T) {
+	cases := []struct {
+		url        string
+		wantDriver string
+		wantPath   string
+		wantDSN    string
+	}{
+		{"postgres://certio:secret@db:5432/certio?sslmode=require", DriverPostgres, "",
+			"postgres://certio:secret@db:5432/certio?sslmode=require"},
+		{"postgresql://db/certio", DriverPostgres, "", "postgresql://db/certio"},
+		{"sqlite:///data/certio.db", DriverSQLite, "/data/certio.db", ""},
+		{"sqlite://certio.db", DriverSQLite, "certio.db", ""},
+		{"sqlite:certio.db", DriverSQLite, "certio.db", ""},
+		{"file:/data/certio.db", DriverSQLite, "/data/certio.db", ""},
+		{"/data/certio.db", DriverSQLite, "/data/certio.db", ""},
+		{"certio.db", DriverSQLite, "certio.db", ""},
+		// A query string is the operator's own pragmas, and survives as the DSN.
+		{"sqlite:///data/certio.db?_pragma=busy_timeout(1)", DriverSQLite, "/data/certio.db",
+			"/data/certio.db?_pragma=busy_timeout(1)"},
+	}
+
+	for _, tc := range cases {
+		cfg := Default()
+		cfg.Database.URL = tc.url
+		if err := cfg.Validate(); err != nil {
+			t.Errorf("%s: Validate: %v", tc.url, err)
+			continue
+		}
+		if cfg.Database.Driver != tc.wantDriver {
+			t.Errorf("%s: driver = %q, want %q", tc.url, cfg.Database.Driver, tc.wantDriver)
+		}
+		if cfg.Database.Path != tc.wantPath {
+			t.Errorf("%s: path = %q, want %q", tc.url, cfg.Database.Path, tc.wantPath)
+		}
+		if cfg.Database.DSN != tc.wantDSN {
+			t.Errorf("%s: dsn = %q, want %q", tc.url, cfg.Database.DSN, tc.wantDSN)
+		}
+	}
+}
+
+// TestDatabaseURLWinsOverTheOlderFields: a URL is explicit, and the fields it
+// replaces are usually a stale default baked into an image.
+func TestDatabaseURLWinsOverTheOlderFields(t *testing.T) {
+	cfg := Default()
+	cfg.Database.Driver, cfg.Database.Path = DriverSQLite, "/data/certio.db"
+	cfg.Database.URL = "postgres://certio@db:5432/certio"
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if cfg.Database.Driver != DriverPostgres {
+		t.Errorf("driver = %q, want the URL's %q", cfg.Database.Driver, DriverPostgres)
+	}
+	if got := cfg.DatabaseDSN(); got != "postgres://certio@db:5432/certio" {
+		t.Errorf("DatabaseDSN() = %q, want the URL", got)
+	}
+}
+
 func TestValidateRejectsBadInput(t *testing.T) {
 	cases := map[string]func(*Config){
 		"port out of range":   func(c *Config) { c.Server.Port = 70000 },
 		"unknown driver":      func(c *Config) { c.Database.Driver = "postgres" },
 		"unknown key policy":  func(c *Config) { c.Security.KeyDownloadPolicy = "sometimes" },
 		"sqlite with no path": func(c *Config) { c.Database.Path, c.Database.DSN = "", "" },
+		"unknown url scheme":  func(c *Config) { c.Database.URL = "mysql://db/certio" },
 	}
 
 	for name, mutate := range cases {

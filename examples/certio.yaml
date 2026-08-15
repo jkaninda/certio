@@ -34,13 +34,15 @@ server:
   # tls_key: /etc/certio/tls/server.key
 
 database:
-  # sqlite is the single-binary story; postgres exists for the deployment that
-  # wants managed backups or more than one instance in front of one database.
-  driver: sqlite
-  path: certio.db
-  # For postgres, set the DSN instead of the path:
-  # driver: postgres
-  # dsn: postgres://certio:secret@localhost:5432/certio?sslmode=require
+  # One URL carries the driver and the connection details. sqlite is the
+  # single-binary story; postgres exists for the deployment that wants managed
+  # backups or more than one instance in front of one database.
+  url: certio.db
+  # url: sqlite:///data/certio.db
+  # url: postgres://certio:secret@localhost:5432/certio?sslmode=require
+  #
+  # driver/path/dsn are the older, separate fields. They still work, and the
+  # url above wins over them when both are present.
 
 security:
   # Encrypts every stored private key. Generate with `certio keygen`.

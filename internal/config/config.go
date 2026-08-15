@@ -5,6 +5,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,6 +66,9 @@ const (
 	DriverPostgres = "postgres"
 )
 
+// DefaultDBPath is the SQLite file used when nothing else is configured.
+const DefaultDBPath = "certio.db"
+
 // DatabaseConfig selects the persistence backend.
 //
 // SQLite is the default and the single-binary story; Postgres exists for the
@@ -72,6 +76,15 @@ const (
 // one database. Path applies to SQLite; DSN applies to either and wins when
 // both are set.
 type DatabaseConfig struct {
+	// URL is the whole database configuration in one value, the way every
+	// other service takes it:
+	//
+	//	postgres://certio:secret@db:5432/certio?sslmode=require
+	//	sqlite:///data/certio.db
+	//
+	// The scheme picks the driver, so nothing else has to be set. It wins over
+	// Driver, Path and DSN, which remain for configurations written before it.
+	URL    string `yaml:"url"`
 	Driver string `yaml:"driver"`
 	Path   string `yaml:"path"`
 	DSN    string `yaml:"dsn"`
@@ -200,7 +213,7 @@ func Default() *Config {
 		},
 		Database: DatabaseConfig{
 			Driver: DriverSQLite,
-			Path:   "certio.db",
+			Path:   DefaultDBPath,
 		},
 		Security: SecurityConfig{
 			JWTIssuer: "certio",
@@ -298,6 +311,7 @@ func (c *Config) applyEnv() {
 	c.ACME.TermsURL = env("ACME_TERMS_URL", c.ACME.TermsURL)
 	c.ACME.WebsiteURL = env("ACME_WEBSITE_URL", c.ACME.WebsiteURL)
 
+	c.Database.URL = env("DB_URL", c.Database.URL)
 	c.Database.Driver = env("DB_DRIVER", c.Database.Driver)
 	c.Database.Path = env("DB_PATH", c.Database.Path)
 	c.Database.DSN = env("DB_DSN", c.Database.DSN)
@@ -346,6 +360,9 @@ func (c *Config) Validate() error {
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("server.port %d out of range", c.Server.Port)
 	}
+	if err := c.applyDatabaseURL(); err != nil {
+		return err
+	}
 	switch c.Database.Driver {
 	case DriverSQLite, "":
 		c.Database.Driver = DriverSQLite
@@ -356,7 +373,7 @@ func (c *Config) Validate() error {
 		c.Database.Driver = DriverPostgres
 		if c.Database.DSN == "" {
 			return errors.New(
-				"database.dsn (CERTIO_DB_DSN) is required for the postgres driver, " +
+				"the postgres driver needs a connection string: set CERTIO_DB_URL, " +
 					"e.g. postgres://certio:secret@localhost:5432/certio?sslmode=require")
 		}
 	default:
@@ -419,6 +436,60 @@ func ResolveSecret(inline, file string) (string, error) {
 		return strings.TrimSpace(string(data)), nil
 	}
 	return inline, nil
+}
+
+// applyDatabaseURL expands database.url (CERTIO_DB_URL) into the driver and
+// the connection string that driver wants. It runs before validation, so the
+// rest of the program never has to know which of the two forms was used.
+//
+// The scheme is the whole decision:
+//
+//	postgres:// | postgresql:// | pgx://   the URL is handed to pgx as it is
+//	sqlite:// | sqlite3:// | file:         the path is opened as a SQLite file
+//	(no scheme)                            a bare path is a SQLite file
+func (c *Config) applyDatabaseURL() error {
+	raw := strings.TrimSpace(c.Database.URL)
+	if raw == "" {
+		return nil
+	}
+
+	scheme, _, hasScheme := strings.Cut(raw, ":")
+	if !hasScheme || strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, ".") {
+		c.Database.Driver = DriverSQLite
+		c.Database.Path, c.Database.DSN = raw, ""
+		return nil
+	}
+
+	switch strings.ToLower(scheme) {
+	case DriverPostgres, "postgresql", "pgx":
+		c.Database.Driver = DriverPostgres
+		c.Database.DSN, c.Database.Path = raw, ""
+		return nil
+
+	case DriverSQLite, "sqlite3", "file":
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			return fmt.Errorf("database.url (%s) is not a URL: %w", EnvPrefix+"DB_URL", err)
+		}
+
+		path := parsed.Opaque
+		if path == "" {
+			path = parsed.Host + parsed.Path
+		}
+		if path == "" {
+			return fmt.Errorf("database.url (%s) names no SQLite file", EnvPrefix+"DB_URL")
+		}
+		c.Database.Driver = DriverSQLite
+		c.Database.Path = path
+		c.Database.DSN = ""
+		if parsed.RawQuery != "" {
+			c.Database.DSN = path + "?" + parsed.RawQuery
+		}
+		return nil
+
+	default:
+		return fmt.Errorf("unsupported database.url scheme %q (want postgres:// or sqlite:)", scheme)
+	}
 }
 
 // DatabaseDSN returns the connection string for the configured driver.

@@ -114,7 +114,7 @@ jobs:
         run: |
           set -euo pipefail
           eval "$(./bin/certio keygen | grep -v '^#' | sed 's/^/export /')"
-          export CERTIO_DB_PATH=/tmp/smoke.db
+          export CERTIO_DB_URL=sqlite:///tmp/smoke.db
           ./bin/certio migrate
           ./bin/certio ca create --cn "CI Root CA" --org CI --country CD
           ./bin/certio cert issue --ca ci-root-ca --cn ci.example.com \

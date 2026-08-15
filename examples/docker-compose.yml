@@ -24,7 +24,7 @@ services:
       CERTIO_MASTER_KEY_FILE: /run/secrets/master_key
       CERTIO_JWT_SECRET_FILE: /run/secrets/jwt_secret
 
-      CERTIO_DB_PATH: /data/certio.db
+      CERTIO_DB_URL: sqlite:///data/certio.db
 
       # Baked into the CRL distribution point of every certificate issued from
       # here on, so it has to be the URL clients can actually reach.

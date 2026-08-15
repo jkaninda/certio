@@ -150,8 +150,7 @@ in [`examples/certio.yaml`](examples/certio.yaml).
 | `CERTIO_MASTER_KEY` / `_FILE` | — | Encrypts every stored private key. **Required in production.** Back it up separately from the database. |
 | `CERTIO_JWT_SECRET` / `_FILE` | — | Signs session tokens. Required in production. |
 | `CERTIO_PRODUCTION` | `false` | Refuses to boot without the two secrets above. |
-| `CERTIO_DB_PATH` | `certio.db` | SQLite file. |
-| `CERTIO_DB_DRIVER` | `sqlite` | `sqlite` or `postgres`. Postgres needs `CERTIO_DB_DSN`. |
+| `CERTIO_DB_URL` | `certio.db` | The whole database in one value; the scheme picks the driver. `sqlite:///data/certio.db` or `postgres://certio:secret@db:5432/certio?sslmode=require`. |
 | `CERTIO_BASE_URL` | `http://localhost:8080` | Baked into the CRL distribution point of issued certificates — must be reachable by clients. |
 | `CERTIO_PORT` / `CERTIO_HOST` | `8080` / `0.0.0.0` | Listener. |
 | `CERTIO_ADMIN_EMAIL` / `_PASSWORD` | — | Creates the first administrator on an empty database, then never again. |
