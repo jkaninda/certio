@@ -68,6 +68,29 @@ audit log. `openssl` stays a *reference*, never a runtime dependency: the engine
 
 ---
 
+## Screenshots
+
+**Dashboard** — every certificate you manage, what expires next, and who did what.
+
+![Certio dashboard](docs/screenshots/dashboard.png)
+
+**Export** — one certificate, in every format a server actually wants: PEM, chain, PKCS#12,
+Kubernetes Secret, nginx/Traefik/HAProxy/Goma snippets.
+
+![Certificate download formats](docs/screenshots/certificate-export.png)
+
+**Distribute trust** — the root URL, the fingerprint to check it against, and per-platform
+install commands for Debian, RHEL, macOS, Windows, Java, Node.js, Docker and curl.
+
+![Distribute trust](docs/screenshots/distribute-trust.png)
+
+**Sign in** — the first administrator comes from `CERTIO_ADMIN_EMAIL` / `CERTIO_ADMIN_PASSWORD`,
+or from `certio user create`.
+
+![Sign in](docs/screenshots/sign-in.png)
+
+---
+
 ## Quick start
 
 ### Docker
