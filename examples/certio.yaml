@@ -77,6 +77,11 @@ security:
 admin:
   # Creates the first administrator on an empty database. Ignored once any
   # account exists, so restarting never resets credentials.
+  #
+  # An empty email defaults to admin@example.com, and an empty password is
+  # generated: it is logged once at startup and written to
+  # initial-admin-password.txt in the data directory. Sign in, change it, then
+  # delete that file.
   email: ""
   password: ""
   name: Administrator

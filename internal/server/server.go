@@ -8,16 +8,30 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
 	"github.com/jkaninda/certio/internal/config"
+	certiocrypto "github.com/jkaninda/certio/internal/crypto"
 	"github.com/jkaninda/certio/internal/metrics"
 	"github.com/jkaninda/certio/internal/server/handlers"
 	"github.com/jkaninda/certio/internal/server/middleware"
 	"github.com/jkaninda/certio/internal/service"
 	"github.com/jkaninda/certio/internal/store"
 	"github.com/jkaninda/okapi"
+)
+
+const (
+	// defaultAdminEmail names the bootstrap account when CERTIO_ADMIN_EMAIL is
+	// unset. It is an address nobody can receive mail at on purpose: it is a
+	// login, and one an operator is expected to change.
+	defaultAdminEmail = "admin@example.com"
+
+	// initialPasswordFile holds a generated bootstrap password inside the data
+	// directory until the operator has used it.
+	initialPasswordFile = "initial-admin-password.txt"
 )
 
 // Server owns the okapi application and everything hanging off it.
@@ -211,8 +225,71 @@ func EnsureSchema(st *store.Store, svc *service.Service, cfg *config.Config, log
 	if err := st.Migrate(); err != nil {
 		return err
 	}
-	if _, err := svc.Bootstrap(cfg.Admin.Email, cfg.Admin.Password, cfg.Admin.Name); err != nil {
+	if log == nil {
+		log = slog.New(slog.DiscardHandler)
+	}
+
+	needs, err := svc.NeedsBootstrap()
+	if err != nil {
+		return fmt.Errorf("server: check for an existing account: %w", err)
+	}
+	if !needs {
+		return nil
+	}
+
+	email := cfg.Admin.Email
+	if email == "" {
+		email = defaultAdminEmail
+	}
+
+	password, generated := cfg.Admin.Password, false
+	if password == "" {
+		password, err = certiocrypto.RandomString(18)
+		if err != nil {
+			return fmt.Errorf("server: generate the initial administrator password: %w", err)
+		}
+		generated = true
+	}
+
+	user, err := svc.Bootstrap(email, password, cfg.Admin.Name)
+	if err != nil {
 		return fmt.Errorf("server: bootstrap the initial administrator: %w", err)
 	}
+	if user == nil || !generated {
+		return nil
+	}
+
+	path, err := writeInitialPassword(cfg, user.Email, password)
+	if err != nil {
+		log.Warn("could not write the generated administrator password to a file",
+			"error", err)
+	}
+	log.Warn("no CERTIO_ADMIN_PASSWORD was set, so an administrator was created with a generated one",
+		"email", user.Email, "password", password, "file", path,
+		"action", "sign in, change this password, then delete the file")
 	return nil
+}
+
+// writeInitialPassword records the generated credential next to the database,
+// for the operator who reads the logs after they have rotated away. It is
+// written 0600 and only ever created — an existing file is left alone, since
+// bootstrap only runs on an empty database and a file already there belongs to
+// an older instance.
+func writeInitialPassword(cfg *config.Config, email, password string) (string, error) {
+	dir := cfg.DataDir()
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, initialPasswordFile)
+
+	body := fmt.Sprintf(`# Certio generated this administrator because CERTIO_ADMIN_PASSWORD was unset.
+# Sign in, change the password, then delete this file.
+email=%s
+password=%s
+`, email, password)
+
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		return "", err
+	}
+	return path, nil
 }

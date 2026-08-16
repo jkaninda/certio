@@ -241,7 +241,7 @@ const policyText: Record<string, string> = {
           </div>
           <p class="copyright">
             Copyright © 2026
-            <a :href="about.repository" target="_blank" rel="noopener noreferrer">Jonas Kaninda</a>
+            <a href="https://jkaninda.dev" target="_blank" rel="noopener noreferrer">Jonas Kaninda</a>
           </p>
         </div>
       </div>

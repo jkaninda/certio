@@ -519,6 +519,23 @@ func (c *Config) EnsureDataDir() error {
 	return os.MkdirAll(dir, 0o750)
 }
 
+// DataDir is where Certio writes state that is not the database itself — the
+// generated bootstrap password, for one. With SQLite it is the directory
+// holding the database, so the file lands on the same volume the operator
+// already mounts; with Postgres there is no such directory, so
+// CERTIO_DATA_DIR names it and the working directory is the fallback.
+func (c *Config) DataDir() string {
+	if dir := env("DATA_DIR", ""); dir != "" {
+		return dir
+	}
+	if c.Database.Driver == DriverSQLite && c.Database.Path != "" {
+		if dir := filepath.Dir(c.Database.Path); dir != "" && dir != "." {
+			return dir
+		}
+	}
+	return "."
+}
+
 // The lookups below delegate to go-utils, which owns the parsing and the
 // fallback in one call. They exist as thin wrappers only to apply EnvPrefix,
 // so no call site has to spell "CERTIO_" out and none can misspell it.
