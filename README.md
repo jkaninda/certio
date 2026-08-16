@@ -13,7 +13,7 @@
   </a>
   <img src="https://img.shields.io/docker/pulls/jkaninda/certio?style=flat-square" alt="Docker Pulls" />
   <a href="https://marketplace.miabi.io/templates/certio">
-  <img src="https://miabi.io/badge.svg?style=flat-square&label=deploy&color=dark" alt="Deploy on Miabi" />
+  <img src="https://miabi.io/badge.svg?style=flat-square&label=deploy" alt="Deploy on Miabi" />
   </a>
 </p>
 
@@ -472,7 +472,7 @@ certManager:
         email: platform@example.com
         directoryUrl: https://certio.example.com/acme/directory
         challengeType: http-01
-        storageFile: /etc/goma/acme/certio.json
+        storageFile: /etc/letsencrypt/certio.json
 ```
 
 Wildcards need `dns-01`, which Goma solves through a DNS provider of its own
