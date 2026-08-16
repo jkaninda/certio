@@ -85,7 +85,7 @@ install commands for Debian, RHEL, macOS, Windows, Java, Node.js, Docker and cur
 ![Distribute trust](docs/screenshots/distribute-trust.png)
 
 **Sign in** — the first administrator comes from `CERTIO_ADMIN_EMAIL` / `CERTIO_ADMIN_PASSWORD`,
-or from `certio user create`.
+or, with no password set, from a generated one printed to the log and the data directory.
 
 ![Sign in](docs/screenshots/sign-in.png)
 
@@ -111,6 +111,18 @@ docker run -d --name certio -p 8080:8080 \
 ```
 
 Open <http://localhost:8080> and sign in. The API description is at `/docs`.
+
+There is no built-in default password. If `CERTIO_ADMIN_PASSWORD` is unset on an empty database,
+Certio creates `admin@example.com` with a generated one, logs it once at startup and writes it to
+`initial-admin-password.txt` in the data directory:
+
+```sh
+docker logs certio | grep 'generated one'
+docker exec certio cat /data/initial-admin-password.txt
+```
+
+Sign in, change the password, then delete that file. Bootstrap only ever runs on an empty
+database, so a restart never resets credentials or regenerates the password.
 
 A complete deployment with file-based secrets is in
 [`examples/docker-compose.yml`](examples/docker-compose.yml).
@@ -188,7 +200,8 @@ in [`examples/certio.yaml`](examples/certio.yaml).
 | `CERTIO_DB_URL` | `certio.db` | The whole database in one value; the scheme picks the driver. `sqlite:///data/certio.db` or `postgres://certio:secret@db:5432/certio?sslmode=require`. |
 | `CERTIO_BASE_URL` | `http://localhost:8080` | Baked into the CRL distribution point of issued certificates — must be reachable by clients. |
 | `CERTIO_PORT` / `CERTIO_HOST` | `8080` / `0.0.0.0` | Listener. |
-| `CERTIO_ADMIN_EMAIL` / `_PASSWORD` | — | Creates the first administrator on an empty database, then never again. |
+| `CERTIO_ADMIN_EMAIL` / `_PASSWORD` | `admin@example.com` / generated | Creates the first administrator on an empty database, then never again. With no password set, one is generated, logged once and written to `initial-admin-password.txt` in the data directory. |
+| `CERTIO_DATA_DIR` | next to the database | Where state that is not the database goes — currently the generated bootstrap password. Required with Postgres if the working directory is not writable. |
 | `CERTIO_KEY_DOWNLOAD_POLICY` | `always` | `once`, `always` or `never`. |
 | `CERTIO_ACCESS_TOKEN_TTL` | `1h` | How long an access token lives. Signing out denies the session immediately, so this is not what bounds a leaked one. |
 | `CERTIO_ISSUE_RATE_LIMIT` | `60` | Issuance per window per principal. `0` disables it. |

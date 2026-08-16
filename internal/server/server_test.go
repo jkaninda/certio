@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -187,6 +188,82 @@ func TestBootstrapAndLogin(t *testing.T) {
 		if status != http.StatusUnauthorized {
 			t.Errorf("login %v: status %d, want 401", creds["email"], status)
 		}
+	}
+}
+
+// An instance booted with no admin credentials configured still ends up with
+// an administrator, and the password it generated is recoverable from the data
+// directory rather than lost with the process.
+func TestBootstrapGeneratesAPasswordWhenNoneIsSet(t *testing.T) {
+	dir := t.TempDir()
+
+	cfg := config.Default()
+	cfg.Database.Path = filepath.Join(dir, "bootstrap-test.db")
+	cfg.Scheduler.Enabled = false
+
+	st, err := store.Open(cfg, nil)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	master, _ := certiocrypto.GenerateMasterKey()
+	keyring, err := certiocrypto.NewKeyring(master)
+	if err != nil {
+		t.Fatalf("NewKeyring: %v", err)
+	}
+	svc := service.New(st, keyring, cfg, nil)
+
+	if err := EnsureSchema(st, svc, cfg, nil); err != nil {
+		t.Fatalf("EnsureSchema: %v", err)
+	}
+
+	raw, err := os.ReadFile(filepath.Join(dir, initialPasswordFile))
+	if err != nil {
+		t.Fatalf("read the generated password file: %v", err)
+	}
+	password := ""
+	for _, line := range strings.Split(string(raw), "\n") {
+		if after, ok := strings.CutPrefix(line, "password="); ok {
+			password = after
+		}
+	}
+	if password == "" {
+		t.Fatalf("no password in %q", raw)
+	}
+
+	// The file is a credential; it must not be world-readable.
+	info, err := os.Stat(filepath.Join(dir, initialPasswordFile))
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("password file mode %o, want 600", perm)
+	}
+
+	// It is the password of an account that actually exists.
+	auth := service.NewAuthenticator([]byte("bootstrap-test-signing-secret"), "certio",
+		15*time.Minute, 24*time.Hour)
+	result, err := svc.Login(audit.SystemActor(), auth, service.LoginInput{
+		Email: defaultAdminEmail, Password: password,
+	})
+	if err != nil {
+		t.Fatalf("log in with the generated password: %v", err)
+	}
+	if result.User.Role != store.RoleAdmin {
+		t.Errorf("role %q, want admin", result.User.Role)
+	}
+
+	// A second boot neither replaces the account nor rewrites the file.
+	if err := EnsureSchema(st, svc, cfg, nil); err != nil {
+		t.Fatalf("EnsureSchema again: %v", err)
+	}
+	again, err := os.ReadFile(filepath.Join(dir, initialPasswordFile))
+	if err != nil {
+		t.Fatalf("re-read the password file: %v", err)
+	}
+	if !bytes.Equal(again, raw) {
+		t.Error("the generated password file was rewritten on the second boot")
 	}
 }
 

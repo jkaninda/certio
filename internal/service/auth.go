@@ -660,6 +660,18 @@ func (s *Service) RevokeAPIToken(actor audit.Actor, id string) error {
 	return nil
 }
 
+// NeedsBootstrap reports whether the instance holds no account at all, and so
+// still needs its first administrator. Callers use it to decide whether to
+// generate a password before calling Bootstrap — asking afterwards would mean
+// generating one on every boot and throwing it away.
+func (s *Service) NeedsBootstrap() (bool, error) {
+	count, err := s.Store.Users.Count()
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
 // Bootstrap creates the first administrator on an empty instance. It is a
 // no-op once any account exists, so restarting the server never resets
 // credentials.

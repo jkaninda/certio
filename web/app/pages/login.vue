@@ -145,8 +145,9 @@ function describe(err: unknown, fallback: string): string {
 
       <p class="login-hint">
         First run? The initial administrator is created from
-        <code>CERTIO_ADMIN_EMAIL</code> and <code>CERTIO_ADMIN_PASSWORD</code>,
-        or with <code>certio user create</code>.
+        <code>CERTIO_ADMIN_EMAIL</code> and <code>CERTIO_ADMIN_PASSWORD</code>.
+        With no password set, one is generated — it is in the server log and in
+        <code>initial-admin-password.txt</code> in the data directory.
       </p>
     </template>
 
