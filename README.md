@@ -13,7 +13,7 @@
   </a>
   <img src="https://img.shields.io/docker/pulls/jkaninda/certio?style=flat-square" alt="Docker Pulls" />
   <a href="https://marketplace.miabi.io/templates/certio">
-  <img src="https://miabi.io/badge.svg?style=flat-square&label=deploy&color=dark" alt="Deploy on Miabi" />
+  <img src="https://miabi.io/badge.svg?style=flat-square&label=deploy" alt="Deploy on Miabi" />
   </a>
 </p>
 
@@ -65,6 +65,29 @@ docker run -p 8080:8080 -v certio:/data jkaninda/certio
 Private keys are AES-256-GCM encrypted at rest. Every mutation is written to an append-only
 audit log. `openssl` stays a *reference*, never a runtime dependency: the engine is Go's
 `crypto/x509` end to end.
+
+---
+
+## Screenshots
+
+**Dashboard** — every certificate you manage, what expires next, and who did what.
+
+![Certio dashboard](docs/screenshots/dashboard.png)
+
+**Export** — one certificate, in every format a server actually wants: PEM, chain, PKCS#12,
+Kubernetes Secret, nginx/Traefik/HAProxy/Goma snippets.
+
+![Certificate download formats](docs/screenshots/certificate-export.png)
+
+**Distribute trust** — the root URL, the fingerprint to check it against, and per-platform
+install commands for Debian, RHEL, macOS, Windows, Java, Node.js, Docker and curl.
+
+![Distribute trust](docs/screenshots/distribute-trust.png)
+
+**Sign in** — the first administrator comes from `CERTIO_ADMIN_EMAIL` / `CERTIO_ADMIN_PASSWORD`,
+or from `certio user create`.
+
+![Sign in](docs/screenshots/sign-in.png)
 
 ---
 
@@ -449,7 +472,7 @@ certManager:
         email: platform@example.com
         directoryUrl: https://certio.example.com/acme/directory
         challengeType: http-01
-        storageFile: /etc/goma/acme/certio.json
+        storageFile: /etc/letsencrypt/certio.json
 ```
 
 Wildcards need `dns-01`, which Goma solves through a DNS provider of its own
