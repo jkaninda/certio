@@ -153,7 +153,7 @@ certio ca create --cn "jkanTech Root CA" --org jkanTech --country CD --days 3650
                  --permit-dns jkaninda.dev --permit-ip 10.0.0.0/8
 certio ca create --type intermediate --parent jkantech-root-ca \
                  --cn "jkanTech Issuing CA" --days 1825
-certio ca import --cert certs/jkantech-ca.crt --key certs/jkantech-ca.key
+certio ca import --cert certs/example-ca.crt --key certs/example-ca.key
 certio ca list
 certio ca export jkantech-root-ca -o ./trust
 
@@ -486,6 +486,9 @@ certManager:
         directoryUrl: https://certio.example.com/acme/directory
         challengeType: http-01
         storageFile: /etc/letsencrypt/certio.json
+        eab:                              # the credential Certio issued
+          kid: 4f8a2c…
+          hmacKey: ${GOMA_ACME_EAB_HMAC}
 ```
 
 Wildcards need `dns-01`, which Goma solves through a DNS provider of its own
@@ -497,13 +500,15 @@ system resolver does not.
 Three things differ from pointing Goma at a public CA, and all three are worth knowing before you
 try it:
 
-**Goma does not implement external account binding.** It registers with plain
-`TermsOfServiceAgreed`, so Certio has to run with `CERTIO_ACME_REQUIRE_EAB=false` for the
-registration to succeed — which drops the control the [ACME section](#acme) argues you should
-keep. If you turn it off, replace it with something else: make `CERTIO_ACME_AUTHORITY` a
-name-constrained intermediate, so the worst an unauthenticated caller can obtain is a certificate
-for a name inside the constraint, and keep the directory off any network you would not hand a
-certificate to.
+**The gateway needs its own external account binding credential.** Goma reads `acme.eab.kid` and
+`acme.eab.hmacKey` (since v0.13.2), so there is no reason to run Certio with
+`CERTIO_ACME_REQUIRE_EAB=false`. Issue one credential per gateway with `allowed_domains` set to
+the names that gateway actually serves — Certio enforces that list as a name constraint on every
+order, so a gateway that is compromised cannot ask for a certificate outside its own zone, and
+revoking the credential is a per-gateway decision. Every field in Goma's config file expands
+`${VAR}`, so keep the HMAC key in the environment rather than in the file. Rotating the `kid`
+makes Goma register a fresh account under the new credential on the next start; rotating only the
+HMAC key does not, because a CA verifies the binding when the account is created and never again.
 
 **Goma verifies the directory's TLS against the system trust store, and has no key for a custom
 root.** Certio's own listener is usually served by a certificate Certio signed, so the Certio root
@@ -521,21 +526,41 @@ resolve there.
 
 ## Migrating from openssl
 
-Every recipe in the [parent repository's README](../README.md) has a direct equivalent:
+Start by adopting the CA you already have. Nothing is re-issued, and every certificate it has
+already signed keeps verifying:
+
+```sh
+certio ca import --cert certs/example-ca.crt --key certs/example-ca.key
+```
+
+The key is adopted as it is and sealed with the master key on the way in, so decrypt it first if
+openssl wrote it with a passphrase: `openssl pkey -in ca.key -out ca-plain.key`. Setting
+`CERTIO_CA_PASSPHRASE` during the import is a different thing — it puts an *extra* passphrase on
+the CA from then on, so that CA cannot be used with the master key alone. From there the recipes
+translate one for one:
 
 | openssl | Certio |
 |---|---|
-| `genpkey -algorithm RSA` | Key algorithm selector on any create form |
-| `req -x509 -new -nodes … -days 1825` | **Authorities → New root CA** |
-| `req -new -key … -subj` | Managed issuance, or `certio cert issue` |
-| `req -new -config san.cnf` | **SAN chip input** — no `.cnf` files, ever |
-| `x509 -req -CA … -CAcreateserial` | Signing with database-tracked random serials |
-| `x509 -in cert.crt -text -noout` | **Inspect** page, or `certio cert inspect` |
-| re-running the chain every year | **Renew** button, or auto-renew |
-| `jkantech-ca.srl` bookkeeping | The `serial_number` column |
+| `genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096` | `--key rsa-4096` on any create or issue command — also `ecdsa-p256`/`p384`/`p521` and `ed25519` |
+| `req -x509 -new -nodes -days 3650` | `certio ca create --cn … --days 3650`, or **Authorities → New root CA** |
+| `req -new -key server.key -subj …` then `x509 -req` | `certio cert issue --ca … --cn …` — key, CSR and signature in one step |
+| `req -new -config san.cnf` | `--san dns:… --san ip:…`, repeated; no `.cnf` to keep in sync with reality |
+| `x509 -req -CA … -CAkey … -CAcreateserial` | `certio cert sign --ca … --csr server.csr`, for a CSR someone handed you |
+| `x509 -in server.crt -text -noout` | `certio cert inspect server.crt` — the same command reads chains, CSRs, keys and CRLs |
+| `pkcs12 -export -out bundle.p12` | `certio cert export <id> --format p12 --password …`, alongside zip, nginx, traefik, haproxy, k8s and compose bundles |
+| `ca -revoke` and `ca -gencrl` | `certio cert revoke <id> --reason 1` — the CRL is republished as part of it |
+| re-running the whole chain every year | `certio cert renew <id> --rekey`, or `--auto-renew` at issue time and never touch it again |
+| `-CAcreateserial` and the `.srl` file beside the CA | Random serials, recorded per CA in the database |
+| `cp ca.crt /usr/local/share/ca-certificates/` | `certio ca export <slug> -o ./trust` writes the root and the chain to distribute |
 
-Already have a CA? `certio ca import --cert ca.crt --key ca.key` adopts it as it is — nothing is
-re-issued, and every certificate it has already signed keeps verifying.
+The commands are the easy half. What actually goes away is the bookkeeping around them: which
+`.cnf` had the right SANs, whether the `.srl` travelled with the CA when it moved hosts, which
+host got which certificate, and when each one expires. That is what the database, the audit log
+and the expiry warnings are for.
+
+`openssl` stays the reference throughout. The [test suite](#testing) checks that it reads every
+certificate, chain, CSR, CRL and PKCS#12 file Certio writes, and that `openssl verify` accepts the
+chains — so this is not a dialect only Certio can read back.
 
 ---
 
