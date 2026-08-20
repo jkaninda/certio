@@ -223,7 +223,7 @@ func ConstraintsOf(cert *x509.Certificate) NameConstraints {
 }
 
 // ImportCA adopts an existing CA from PEM certificate and key material — the
-// path that lets this repo's jkantech-ca.crt/.key move into Certio unchanged.
+// path that lets an existing example-ca.crt/.key pair move into Certio unchanged.
 func ImportCA(certPEM, keyPEM []byte) (*CertificateAuthority, error) {
 	certs, err := ParseCertificatesPEM(certPEM)
 	if err != nil {
