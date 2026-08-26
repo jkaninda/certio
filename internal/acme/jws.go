@@ -16,7 +16,6 @@ package acme
 
 import (
 	"crypto"
-	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/elliptic"
@@ -229,7 +228,7 @@ func (k *JWK) PublicKey() (crypto.PublicKey, error) {
 
 	switch k.Kty {
 	case "EC":
-		curve, ecdhCurve, size, err := curveFor(k.Crv)
+		curve, size, err := curveFor(k.Crv)
 		if err != nil {
 			return nil, err
 		}
@@ -247,23 +246,21 @@ func (k *JWK) PublicKey() (crypto.PublicKey, error) {
 			return nil, fmt.Errorf("acme: %s coordinates must be %d bytes each", k.Crv, size)
 		}
 
-		// The on-curve check goes through crypto/ecdh rather than the
-		// deprecated elliptic.IsOnCurve: NewPublicKey validates the point, and
+		// ParseUncompressedPublicKey validates the point and rejects the point
+		// at infinity, so it stands in for the deprecated elliptic.IsOnCurve:
 		// an unchecked point reaching crypto/ecdsa is a well-known way to leak
-		// information about a private key in other protocols.
+		// information about a private key in other protocols. It also builds
+		// the key without touching the deprecated X and Y fields, whose
+		// big.Int values are not safe to assemble by hand.
 		point := make([]byte, 0, 1+2*size)
 		point = append(point, 4) // SEC 1 uncompressed
 		point = append(point, x...)
 		point = append(point, y...)
-		if _, err := ecdhCurve.NewPublicKey(point); err != nil {
+		pub, err := ecdsa.ParseUncompressedPublicKey(curve, point)
+		if err != nil {
 			return nil, fmt.Errorf("acme: the supplied point is not on the curve: %w", err)
 		}
-
-		return &ecdsa.PublicKey{
-			Curve: curve,
-			X:     new(big.Int).SetBytes(x),
-			Y:     new(big.Int).SetBytes(y),
-		}, nil
+		return pub, nil
 
 	case "RSA":
 		n, err := b64.DecodeString(k.N)
@@ -299,19 +296,18 @@ func (k *JWK) PublicKey() (crypto.PublicKey, error) {
 	return nil, fmt.Errorf("acme: unsupported key type %q", k.Kty)
 }
 
-// curveFor returns both spellings of a curve: the elliptic.Curve that
-// crypto/ecdsa still wants, and the ecdh.Curve whose NewPublicKey does the
-// on-curve validation.
-func curveFor(name string) (curve elliptic.Curve, exchange ecdh.Curve, size int, err error) {
+// curveFor returns the elliptic.Curve crypto/ecdsa wants, together with the
+// fixed coordinate width RFC 7518 6.2.1.2 gives that curve.
+func curveFor(name string) (curve elliptic.Curve, size int, err error) {
 	switch name {
 	case "P-256":
-		return elliptic.P256(), ecdh.P256(), 32, nil
+		return elliptic.P256(), 32, nil
 	case "P-384":
-		return elliptic.P384(), ecdh.P384(), 48, nil
+		return elliptic.P384(), 48, nil
 	case "P-521":
-		return elliptic.P521(), ecdh.P521(), 66, nil
+		return elliptic.P521(), 66, nil
 	}
-	return nil, nil, 0, fmt.Errorf("acme: unsupported curve %q", name)
+	return nil, 0, fmt.Errorf("acme: unsupported curve %q", name)
 }
 
 // Thumbprint is the RFC 7638 SHA-256 thumbprint, base64url-encoded.
