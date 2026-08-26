@@ -41,7 +41,7 @@ FROM alpine:3.24
 LABEL org.opencontainers.image.title="Certio" \
       org.opencontainers.image.description="Self-signed PKI and TLS certificate manager" \
       org.opencontainers.image.source="https://github.com/jkaninda/certio" \
-      org.opencontainers.image.licenses="Apache-2.0"
+      org.opencontainers.image.licenses="AGPL-3.0"
 
 # ca-certificates so webhook and SMTP notifications can verify the TLS they
 # connect over; tzdata so a schedule configured in a local zone means what it

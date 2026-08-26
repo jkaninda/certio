@@ -208,7 +208,7 @@ func (h *Handler) About(c *okapi.Context) error {
 		GoVersion: runtime.Version(),
 		Platform:  runtime.GOOS + "/" + runtime.GOARCH,
 
-		License:       "Apache-2.0",
+		License:       "AGPL-3.0",
 		LicenseURL:    "https://github.com/jkaninda/certio/blob/main/LICENSE",
 		Repository:    "https://github.com/jkaninda/certio",
 		Documentation: "https://github.com/jkaninda/certio#readme",
