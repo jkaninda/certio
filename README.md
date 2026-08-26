@@ -566,4 +566,4 @@ chains — so this is not a dialect only Certio can read back.
 
 ## License
 
-[Apache-2.0](LICENSE) © [Jonas Kaninda](https://github.com/jkaninda)
+[AGPL-3.0-or-later](LICENSE) © [Jonas Kaninda](https://github.com/jkaninda)

@@ -162,7 +162,7 @@ func (s *Server) docs(version string) {
 		Description: "Self-signed PKI and TLS certificate management. " +
 			"Create certificate authorities, issue and renew certificates with full SAN support, " +
 			"revoke and publish CRLs, and export in every format a server actually wants.",
-		License: okapi.License{Name: "Apache-2.0", URL: "https://github.com/jkaninda/certio/blob/main/LICENSE"},
+		License: okapi.License{Name: "AGPL-3.0", URL: "https://github.com/jkaninda/certio/blob/main/LICENSE"},
 		Contact: okapi.Contact{Name: "jkaninda", URL: "https://github.com/jkaninda/certio"},
 	}).WithDocUI(okapi.ScalarUI)
 }
