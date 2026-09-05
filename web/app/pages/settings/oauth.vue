@@ -29,6 +29,7 @@ const form = reactive({
   name_field: 'name',
   allowed_domains: '',
   allow_signup: true,
+  allow_unverified_email: false,
   default_role: 'viewer' as Role,
   enabled: true,
 })
@@ -130,6 +131,7 @@ async function load() {
       name_field: provider.value.name_field,
       allowed_domains: provider.value.allowed_domains.join(', '),
       allow_signup: provider.value.allow_signup,
+      allow_unverified_email: provider.value.allow_unverified_email,
       default_role: provider.value.default_role,
       enabled: provider.value.enabled,
     })
@@ -190,6 +192,7 @@ async function save() {
       name_field: form.name_field,
       allowed_domains: splitList(form.allowed_domains),
       allow_signup: form.allow_signup,
+      allow_unverified_email: form.allow_unverified_email,
       default_role: form.default_role,
       enabled: form.enabled,
     })
@@ -396,6 +399,19 @@ async function remove() {
             <p class="form-hint">
               Viewer is the default on purpose: an identity provider says who somebody is,
               not what they may sign.
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="form.allow_unverified_email" type="checkbox">
+              Accept addresses the provider has not verified
+            </label>
+            <p class="form-hint">
+              Leave this off for a public provider: an unverified address is a claim, and
+              accepting one lets anybody who types it at the provider take over the matching
+              account. Turn it on for a directory that simply never sends
+              <code>email_verified</code>.
             </p>
           </div>
 

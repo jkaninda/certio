@@ -93,6 +93,7 @@ export interface OAuthProvider {
   name_field: string
   allowed_domains: string[]
   allow_signup: boolean
+  allow_unverified_email: boolean
   default_role: Role
   enabled: boolean
   /** Derived from the instance base URL; this is what to register at the provider. */
@@ -116,6 +117,7 @@ export interface SaveOAuthProviderRequest {
   name_field: string
   allowed_domains: string[]
   allow_signup: boolean
+  allow_unverified_email: boolean
   default_role: Role
   enabled: boolean
 }

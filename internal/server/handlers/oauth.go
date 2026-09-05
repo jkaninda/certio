@@ -90,8 +90,11 @@ func (h *Handler) SaveOAuthProvider(c *okapi.Context, req *dto.SaveOAuthProvider
 		NameField:      in.NameField,
 		AllowedDomains: in.AllowedDomains,
 		AllowSignup:    in.AllowSignup,
-		DefaultRole:    in.DefaultRole,
-		Enabled:        in.Enabled,
+
+		AllowUnverifiedEmail: in.AllowUnverifiedEmail,
+
+		DefaultRole: in.DefaultRole,
+		Enabled:     in.Enabled,
 	})
 	if err != nil {
 		return h.fail(c, err)
