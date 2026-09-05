@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: '1.27'
           cache: true
 
       # openssl is present on the runner, so the cross-check tests in
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: '1.27'
           cache: true
       # v9 runs golangci-lint v2, which .golangci.yml is already written for.
       # The timeout lives in that file, so it is not repeated here.
@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: '1.26'
+          go-version: '1.27'
           cache: true
 
       - uses: actions/download-artifact@v8
