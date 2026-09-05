@@ -13,7 +13,7 @@ COPY web/ ./
 RUN npm run build
 
 # ─── Stage 2: build the binary ───────────────────────────────────────────────
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 
 WORKDIR /build
 
