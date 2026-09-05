@@ -242,6 +242,8 @@ certbot certonly --server https://certio.example.com/acme/directory \
         --eab-kid <kid> --eab-hmac-key <hmac> -d api.corp.example.com
 ```
 
+### cert-manager
+
 cert-manager wants the same three values:
 
 ```yaml
@@ -258,6 +260,52 @@ spec:
       keySecretRef: { name: certio-eab, key: hmac }
     solvers:
       - http01: { ingress: { class: nginx } }
+```
+### Goma Gateway
+
+```yaml
+version: 2
+gateway:
+  tls:
+  certsDir: /etc/goma/certs
+  entryPoints:
+    web:
+      address: "[::]:80" 
+    webSecure:
+      address: "[::]:443"
+  networking:
+    dnsCache:
+      ttl: 300
+      clearOnReload: true
+  providers:
+    file:
+      enabled: true
+      directory: /etc/goma/providers
+      watch: true
+  log:
+   level: info
+  routes:
+    - name: api-example
+      path: /
+      hosts: ["api.example.com"]
+      backends:
+        - endpoint: http://api-example:8080
+      middlewares: []
+middlewares: []
+certManager:
+  # Provider used for routes that don't set tls.provider
+  defaultProvider: certio
+  providers:
+    certio:
+      type: acme
+      acme:
+        email: admin@example.com
+        directoryUrl: https://certio.example.com/acme/directory
+        insecureSkipVerify: false
+        eab:
+          kid: 152300f0603e75bd5156e5b5
+          hmacKey: KZoedoSz5MgYu2dJqT7npxYynw6BUe3AS8TK20jRWnI
+        storageFile: /etc/letsencrypt/certio.json
 ```
 
 **External account binding is on by default and should stay that way.** Let's Encrypt can accept
