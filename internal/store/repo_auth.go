@@ -1,6 +1,7 @@
 package store
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -35,6 +36,20 @@ func (r *UserRepo) Get(id string) (*User, error) {
 func (r *UserRepo) GetByEmail(email string) (*User, error) {
 	var u User
 	err := r.db.First(&u, "email = ?", strings.ToLower(strings.TrimSpace(email))).Error
+	if err != nil {
+		return nil, translate(err)
+	}
+	return &u, nil
+}
+
+// GetByOAuth loads the account a federated identity belongs to, keyed on the
+// provider's own subject rather than on the email it happens to carry today.
+func (r *UserRepo) GetByOAuth(provider, subject string) (*User, error) {
+	if provider == "" || subject == "" {
+		return nil, ErrNotFound
+	}
+	var u User
+	err := r.db.First(&u, "oauth_provider = ? AND oauth_subject = ?", provider, subject).Error
 	if err != nil {
 		return nil, translate(err)
 	}
@@ -95,6 +110,41 @@ func (r *UserRepo) CountAdmins() (int64, error) {
 func (r *UserRepo) TouchLogin(id string) error {
 	now := time.Now().UTC()
 	return translate(r.db.Model(&User{}).Where("id = ?", id).Update("last_login_at", now).Error)
+}
+
+// OAuthRepo persists the single external identity provider. Every method
+// works on "the" provider rather than on an id: the table holds at most one
+// row by construction, and an id in the API would only invite a second.
+type OAuthRepo struct{ db *gorm.DB }
+
+// Get loads the configured provider, returning ErrNotFound when sign-in has
+// not been federated.
+func (r *OAuthRepo) Get() (*OAuthProvider, error) {
+	var p OAuthProvider
+	if err := r.db.Order("created_at ASC").First(&p).Error; err != nil {
+		return nil, translate(err)
+	}
+	return &p, nil
+}
+
+// Save upserts the provider onto the one row, adopting the existing row's id
+// so a re-save replaces the configuration rather than accumulating providers.
+func (r *OAuthRepo) Save(p *OAuthProvider) error {
+	existing, err := r.Get()
+	switch {
+	case errors.Is(err, ErrNotFound):
+		return translate(r.db.Create(p).Error)
+	case err != nil:
+		return err
+	}
+	p.ID = existing.ID
+	p.CreatedAt = existing.CreatedAt
+	return translate(r.db.Save(p).Error)
+}
+
+// Delete removes the provider, returning federated sign-in to off.
+func (r *OAuthRepo) Delete() error {
+	return translate(r.db.Where("1 = 1").Delete(&OAuthProvider{}).Error)
 }
 
 // TokenRepo persists API tokens.

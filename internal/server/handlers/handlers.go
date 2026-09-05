@@ -85,16 +85,28 @@ func (h *Handler) fail(c *okapi.Context, err error) error {
 			Error: "key_unavailable", Message: cleanMessage(err),
 		})
 
+	case errors.Is(err, service.ErrOAuthNotConfigured):
+
+		return c.AbortWithJSON(http.StatusNotFound, dto.ErrorResponse{
+			Error: "oauth_not_configured", Message: err.Error(),
+		})
+
+	case errors.Is(err, service.ErrOAuthDenied):
+
+		return c.AbortWithJSON(http.StatusForbidden, dto.ErrorResponse{
+			Error: "oauth_denied", Message: cleanMessage(err),
+		})
+
 	case errors.Is(err, service.ErrInvalidTwoFactorCode):
-		// A distinct code so the dashboard can keep the user on the code step
-		// instead of sending them back to the password form.
+
 		return c.AbortWithJSON(http.StatusUnauthorized, dto.ErrorResponse{
 			Error: "invalid_two_factor_code", Message: err.Error(),
 		})
 
 	case errors.Is(err, service.ErrInvalidCredentials), errors.Is(err, service.ErrAccountDisabled):
+
 		return c.AbortWithJSON(http.StatusUnauthorized, dto.ErrorResponse{
-			Error: "unauthorized", Message: err.Error(),
+			Error: "unauthorized", Message: cleanMessage(err),
 		})
 
 	default:
@@ -111,7 +123,13 @@ func (h *Handler) fail(c *okapi.Context, err error) error {
 // cleanMessage strips the sentinel prefix so users see the useful half.
 func cleanMessage(err error) string {
 	msg := err.Error()
-	for _, prefix := range []string{"validation failed: ", "pki: ", "store: ", "service: "} {
+	prefixes := []string{
+		"validation failed: ", "pki: ", "store: ", "service: ",
+		// Only ever present when something more specific follows: the bare
+		// sentinel has no trailing colon and is left as it is.
+		"invalid email or password: ",
+	}
+	for _, prefix := range prefixes {
 		msg = strings.TrimPrefix(msg, prefix)
 	}
 	return msg

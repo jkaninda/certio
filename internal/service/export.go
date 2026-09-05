@@ -389,19 +389,29 @@ func gomaRouteSnippet(cert *store.Certificate, base string) []byte {
 	b.WriteString("      backends:\n")
 	b.WriteString("        - endpoint: http://127.0.0.1:8080\n")
 	b.WriteString("      tls:\n")
-	b.WriteString("        certificates:\n")
-	fmt.Fprintf(&b, "          - cert: /etc/goma/certs/%s-fullchain.pem\n", base)
-	fmt.Fprintf(&b, "            key: /etc/goma/certs/%s.key\n", base)
 
-	// A client or peer profile is issued to be presented, not just accepted, so
-	// the snippet points at the mTLS knob rather than leaving it implied.
+	b.WriteString("        certificate:\n")
+	fmt.Fprintf(&b, "          cert: /etc/goma/certs/%s-fullchain.pem\n", base)
+	fmt.Fprintf(&b, "          key: /etc/goma/certs/%s.key\n", base)
+
+	b.WriteString("        provider: none\n")
+
 	if cert.Profile == pki.ProfilePeer || cert.Profile == pki.ProfileClient {
 		b.WriteString("\n")
-		b.WriteString("      # This certificate carries clientAuth, so it is meant for mutual TLS.\n")
-		b.WriteString("      # Verify callers against the issuing CA:\n")
+		b.WriteString("      # This certificate carries clientAuth, so it can also be presented to\n")
+		b.WriteString("      # the backend instead of only being served to callers:\n")
 		b.WriteString("      #   security:\n")
 		b.WriteString("      #     tls:\n")
-		b.WriteString("      #       rootCAs: /etc/goma/certs/root.crt\n")
+		fmt.Fprintf(&b, "      #       clientCert: /etc/goma/certs/%s.crt\n", base)
+		fmt.Fprintf(&b, "      #       clientKey:  /etc/goma/certs/%s.key\n", base)
+		b.WriteString("      #       rootCAs:    /etc/goma/certs/root.crt\n")
+		b.WriteString("      #\n")
+		b.WriteString("      # Verifying *incoming* callers is gateway-wide, not per route:\n")
+		b.WriteString("      #   gateway:\n")
+		b.WriteString("      #     tls:\n")
+		b.WriteString("      #       clientAuth:\n")
+		b.WriteString("      #         clientCA: /etc/goma/certs/root.crt\n")
+		b.WriteString("      #         required: true\n")
 	}
 	return []byte(b.String())
 }

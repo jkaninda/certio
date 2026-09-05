@@ -1,7 +1,10 @@
 import { useAuthStore } from '~/stores/auth'
 
-/** Routes reachable without a session. */
-const PUBLIC_ROUTES = new Set(['/login'])
+/**
+ * Routes reachable without a session. /oauth/callback is where the identity
+ * provider lands the browser back, which is by definition before there is one.
+ */
+const PUBLIC_ROUTES = new Set(['/login', '/oauth/callback'])
 
 export default defineNuxtRouteMiddleware(async (to) => {
   // This is a client-rendered SPA; there is no server pass to guard.
@@ -16,8 +19,10 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (PUBLIC_ROUTES.has(to.path)) {
-    // An authenticated user has no business on the login page.
-    if (auth.isAuthenticated) return navigateTo('/')
+    // An authenticated user has no business on the login page — but the OAuth
+    // callback signs them in as it runs, and bouncing it would abort the
+    // exchange it is in the middle of.
+    if (auth.isAuthenticated && to.path !== '/oauth/callback') return navigateTo('/')
     return
   }
 

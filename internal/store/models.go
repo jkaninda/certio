@@ -275,6 +275,20 @@ type User struct {
 	Status       string     `gorm:"size:20;not null;default:active" json:"status"`
 	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
 
+	// OAuthProvider names the identity provider that vouches for this account,
+	// and is empty for one that signs in with a password. OAuthSubject is that
+	// provider's own identifier for the person — the "sub" claim, usually.
+	//
+	// The subject is what the account is really keyed on: an email address can
+	// be reassigned to a new employee, and matching on it alone would hand
+	// them the previous holder's certificates. Email is used once, to link a
+	// federated identity to an account that already exists.
+	//
+	// The column names are pinned for the same reason SANs' is: GORM's default
+	// namer turns "OAuthProvider" into "o_auth_provider".
+	OAuthProvider string `gorm:"column:oauth_provider;size:64;index" json:"oauth_provider,omitempty"`
+	OAuthSubject  string `gorm:"column:oauth_subject;size:255;index" json:"-"`
+
 	// TOTPSecret* hold the second factor's shared secret, sealed with the
 	// master key like every other secret Certio stores. It is written when
 	// enrolment starts and only becomes usable once TOTPEnabled flips, so an
@@ -308,6 +322,15 @@ func (u *User) BeforeCreate(tx *gorm.DB) error { return assignID(&u.ID) }
 // IsActive reports whether the account may sign in.
 func (u *User) IsActive() bool { return u.Status == StatusActive }
 
+// IsFederated reports whether the account signs in through an external
+// identity provider.
+func (u *User) IsFederated() bool { return u.OAuthProvider != "" }
+
+// HasPassword reports whether the account can sign in with a password at all.
+// An account provisioned from an identity provider has no hash, and password
+// sign-in for it must fail as surely as a wrong password would.
+func (u *User) HasPassword() bool { return u.PasswordHash != "" }
+
 // HasTwoFactor reports whether the account must present a second factor to
 // sign in. A pending enrolment does not count.
 func (u *User) HasTwoFactor() bool { return u.TOTPEnabled && len(u.TOTPSecretEncrypted) > 0 }
@@ -318,6 +341,82 @@ func (u *User) TOTPEnrollmentPending() bool { return !u.TOTPEnabled && len(u.TOT
 
 // RecoveryCodesRemaining is how many single-use codes are still unspent.
 func (u *User) RecoveryCodesRemaining() int { return len(u.RecoveryCodes.Data) }
+
+// OAuthProvider is the external identity provider an instance delegates
+// sign-in to. There is at most one row: Certio offers a single provider rather
+// than a list, because the thing an operator actually wants is "our company
+// SSO", and a chooser between three login buttons is a worse answer to that
+// than one.
+//
+// Everything except the client secret is stored in the clear — the endpoints
+// and the client id are public by construction, since the browser is handed
+// them on the way to the authorization page. The secret is sealed with the
+// master key like every other secret Certio holds.
+type OAuthProvider struct {
+	Model
+	// Name identifies the provider in the audit log and on User.OAuthProvider,
+	// e.g. "keycloak" or "entra". DisplayName is what the sign-in button says.
+	Name        string `gorm:"size:64;not null" json:"name"`
+	DisplayName string `gorm:"size:191" json:"display_name"`
+
+	ClientID              string `gorm:"size:255;not null" json:"client_id"`
+	ClientSecretEncrypted []byte `json:"-"`
+	ClientSecretNonce     []byte `json:"-"`
+	ClientSecretSalt      []byte `json:"-"`
+
+	AuthURL     string `gorm:"size:512;not null" json:"auth_url"`
+	TokenURL    string `gorm:"size:512;not null" json:"token_url"`
+	UserInfoURL string `gorm:"size:512;not null" json:"user_info_url"`
+
+	Scopes JSONField[[]string] `gorm:"column:scopes;type:text" json:"scopes"`
+
+	SubjectField string `gorm:"size:64" json:"subject_field"`
+	EmailField   string `gorm:"size:64" json:"email_field"`
+	NameField    string `gorm:"size:64" json:"name_field"`
+
+	AllowedDomains JSONField[[]string] `gorm:"column:allowed_domains;type:text" json:"allowed_domains"`
+
+	AllowSignup bool `gorm:"not null" json:"allow_signup"`
+
+	DefaultRole string `gorm:"size:20;not null;default:viewer" json:"default_role"`
+
+	Enabled bool `gorm:"not null" json:"enabled"`
+}
+
+// TableName pins the table name.
+func (OAuthProvider) TableName() string { return "oauth_providers" }
+
+// BeforeCreate assigns the UUID primary key.
+func (p *OAuthProvider) BeforeCreate(tx *gorm.DB) error { return assignID(&p.ID) }
+
+// Label is what the sign-in button should say, falling back to the provider
+// name when no display name was configured.
+func (p *OAuthProvider) Label() string {
+	if p.DisplayName != "" {
+		return p.DisplayName
+	}
+	return p.Name
+}
+
+// ApplyDefaults fills the field mappings and the provisioning role that a
+// caller left blank, so the OIDC spelling is what you get by saying nothing.
+func (p *OAuthProvider) ApplyDefaults() {
+	if p.SubjectField == "" {
+		p.SubjectField = "sub"
+	}
+	if p.EmailField == "" {
+		p.EmailField = "email"
+	}
+	if p.NameField == "" {
+		p.NameField = "name"
+	}
+	if p.DefaultRole == "" {
+		p.DefaultRole = RoleViewer
+	}
+	if len(p.Scopes.Data) == 0 {
+		p.Scopes = JSON([]string{"openid", "email", "profile"})
+	}
+}
 
 // APIToken is a long-lived bearer credential for automation.
 type APIToken struct {

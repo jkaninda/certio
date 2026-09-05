@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import type { LoginResponse, TokenResponse, User } from '~/types/api'
+import type { LoginResponse, OAuthStatus, TokenResponse, User } from '~/types/api'
 
 const REFRESH_KEY = 'certio_refresh_token'
 
@@ -61,6 +61,39 @@ export const useAuthStore = defineStore('auth', () => {
     return null
   }
 
+  /**
+   * completeOAuth exchanges the code the identity provider handed the browser
+   * for a session. Like login(), a two-factor challenge is returned rather
+   * than thrown: the provider proved who somebody is, and the second factor
+   * they enrolled is still owed.
+   */
+  async function completeOAuth(code: string, state: string): Promise<TwoFactorChallenge | null> {
+    const api = useApi()
+    const payload = await api.post<LoginResponse>('/auth/oauth/callback', { code, state })
+
+    if (payload.two_factor_required) {
+      return {
+        token: payload.challenge_token ?? '',
+        expiresIn: payload.challenge_expires_in ?? 0,
+      }
+    }
+    setSession(payload)
+    return null
+  }
+
+  /**
+   * oauthStatus reports whether this instance offers single sign-on. It fails
+   * soft: a sign-in page without an SSO button is a working sign-in page, and
+   * a network blip should not replace it with an error.
+   */
+  async function oauthStatus(): Promise<OAuthStatus> {
+    try {
+      return await useApi().get<OAuthStatus>('/auth/oauth')
+    } catch {
+      return { enabled: false }
+    }
+  }
+
   /** verifyTwoFactor exchanges a challenge and a code for a session. */
   async function verifyTwoFactor(challengeToken: string, code: string) {
     const api = useApi()
@@ -119,5 +152,6 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken, user, ready,
     isAuthenticated, isAdmin, canWrite,
     setSession, clearSession, login, verifyTwoFactor, logout, restore,
+    completeOAuth, oauthStatus,
   }
 })

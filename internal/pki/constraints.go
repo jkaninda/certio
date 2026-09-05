@@ -6,22 +6,6 @@ import (
 	"strings"
 )
 
-// NameConstraints limits the names a CA is allowed to certify, as RFC 5280
-// §4.2.1.10 defines them.
-//
-// This is the single most valuable extension on a private root, and the one
-// most often left off. A root installed in a laptop's system trust store can,
-// without constraints, mint a certificate for any name on the internet — so a
-// stolen CA key is not "an internal problem", it is a universal one. With
-// `PermittedDNS: ["corp.example.com"]` the same stolen key can only lie about
-// names the organisation already owns.
-//
-// Enforcement is the verifier's job, not the issuer's. Go's crypto/x509,
-// OpenSSL, macOS and Windows all check constraints while building a chain, so
-// a constrained CA is enforced by the clients that matter even if Certio
-// itself is compromised. Certio additionally refuses at issuance time, so the
-// failure shows up at the point someone can fix it rather than as a mystery
-// browser error later.
 type NameConstraints struct {
 	PermittedDNS   []string `json:"permitted_dns,omitempty"`
 	ExcludedDNS    []string `json:"excluded_dns,omitempty"`
@@ -86,13 +70,9 @@ func (n NameConstraints) IPNets() (permitted, excluded []*net.IPNet, err error) 
 	return permitted, excluded, nil
 }
 
-// PermitsDNS reports whether a DNS name satisfies the constraints, using RFC
-// 5280 matching: a constraint of "example.com" covers "example.com" and
-// anything under it, and an exclusion always beats a permission.
 func (n NameConstraints) PermitsDNS(name string) bool {
 	name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
-	// A wildcard is judged by the domain it stands for: *.corp.example.com is
-	// a name under corp.example.com.
+
 	name = strings.TrimPrefix(name, "*.")
 	if name == "" {
 		return false
@@ -121,8 +101,6 @@ func (n NameConstraints) PermitsIP(ip net.IP) bool {
 	}
 	permitted, excluded, err := n.IPNets()
 	if err != nil {
-		// Validate rejects this at configuration time; reaching here means a
-		// row was written around it, and refusing is the safe reading.
 		return false
 	}
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useAuthStore } from '~/stores/auth'
 import { ApiRequestError } from '~/composables/useApi'
+import type { OAuthStatus } from '~/types/api'
 
 definePageMeta({ layout: 'auth' })
 useHead({ title: 'Sign in · Certio' })
@@ -20,6 +21,42 @@ const challengeToken = ref('')
 const code = ref('')
 const useRecoveryCode = ref(false)
 const codeInput = ref<HTMLInputElement | null>(null)
+
+// Single sign-on, when the instance offers it. The status is fetched rather
+// than assumed so an instance that has not federated shows no button at all,
+// instead of one that leads to a 404.
+const sso = ref<OAuthStatus>({ enabled: false })
+// A federated sign-in that owes a second factor comes back through
+// /oauth/callback, which parks the challenge here rather than building a
+// second code form of its own.
+const viaSSO = ref(false)
+
+onMounted(async () => {
+  const parked = sessionStorage.getItem('certio_oauth_challenge')
+  if (parked) {
+    sessionStorage.removeItem('certio_oauth_challenge')
+    challengeToken.value = parked
+    viaSSO.value = true
+    await nextTick()
+    codeInput.value?.focus()
+  }
+  sso.value = await auth.oauthStatus()
+})
+
+/**
+ * startSSO hands the browser to the API, which mints the CSRF state and the
+ * PKCE verifier and redirects on to the provider. It is a full navigation, not
+ * a fetch: the whole point is to leave this origin.
+ */
+function startSSO() {
+  if (!sso.value.start_url) return
+  const redirect = route.query.redirect as string | undefined
+  if (redirect?.startsWith('/')) {
+    sessionStorage.setItem('certio_oauth_redirect', redirect)
+  }
+  busy.value = true
+  window.location.href = sso.value.start_url
+}
 
 async function submitCredentials() {
   error.value = ''
@@ -69,8 +106,13 @@ async function submitCode() {
 }
 
 async function finish() {
-  const redirect = route.query.redirect as string | undefined
-  await navigateTo(redirect && redirect.startsWith('/') ? redirect : '/')
+  // A federated sign-in loses the query string at the provider, so where the
+  // user was headed was parked before leaving and is read back here.
+  const parked = sessionStorage.getItem('certio_oauth_redirect')
+  sessionStorage.removeItem('certio_oauth_redirect')
+
+  const redirect = (route.query.redirect as string | undefined) ?? parked ?? undefined
+  await navigateTo(redirect?.startsWith('/') ? redirect : '/')
 }
 
 function restart() {
@@ -78,6 +120,7 @@ function restart() {
   code.value = ''
   error.value = ''
   useRecoveryCode.value = false
+  viaSSO.value = false
 }
 
 function describe(err: unknown, fallback: string): string {
@@ -99,7 +142,9 @@ function describe(err: unknown, fallback: string): string {
       <p class="login-subtitle">
         {{ useRecoveryCode
           ? 'Enter one of the recovery codes you saved when you set this up.'
-          : `Enter the six-digit code from your authenticator app for ${email}.` }}
+          : email
+            ? `Enter the six-digit code from your authenticator app for ${email}.`
+            : 'Enter the six-digit code from your authenticator app.' }}
       </p>
     </template>
 
@@ -143,6 +188,14 @@ function describe(err: unknown, fallback: string): string {
         {{ busy ? 'Signing in…' : 'Sign in' }}
       </button>
 
+      <template v-if="sso.enabled">
+        <div class="sso-divider"><span>or</span></div>
+        <button class="btn btn-secondary auth-btn" type="button" :disabled="busy" @click="startSSO">
+          <span class="mdi mdi-shield-account-outline" />
+          Continue with {{ sso.label }}
+        </button>
+      </template>
+
       <p class="login-hint">
         First run? The initial administrator is created from
         <code>CERTIO_ADMIN_EMAIL</code> and <code>CERTIO_ADMIN_PASSWORD</code>.
@@ -181,7 +234,9 @@ function describe(err: unknown, fallback: string): string {
         <button type="button" class="link-button" @click="useRecoveryCode = !useRecoveryCode; code = ''">
           {{ useRecoveryCode ? 'Use my authenticator app' : 'Use a recovery code' }}
         </button>
-        <button type="button" class="link-button" @click="restart">Back</button>
+        <button type="button" class="link-button" @click="restart">
+          {{ viaSSO ? 'Start over' : 'Back' }}
+        </button>
       </div>
 
       <p class="login-hint">
@@ -237,6 +292,24 @@ function describe(err: unknown, fallback: string): string {
   padding: 11px 18px;
   font-size: 15px;
   margin-top: 4px;
+}
+
+/* A rule with the word sitting in it, so the two ways in read as alternatives
+   rather than as a stack of buttons. */
+.sso-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.sso-divider::before,
+.sso-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-primary);
 }
 
 .login-links {

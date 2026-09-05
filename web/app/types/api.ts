@@ -30,6 +30,8 @@ export interface User {
   two_factor_enabled: boolean
   last_login_at?: string
   created_at: string
+  /** The identity provider this account signs in through, absent for a local one. */
+  oauth_provider?: string
 }
 
 export interface TokenResponse {
@@ -59,6 +61,63 @@ export interface LoginResponse {
 
   used_recovery_code?: boolean
   recovery_codes_remaining?: number
+}
+
+/**
+ * OAuthStatus is the unauthenticated view the sign-in page gets: whether this
+ * instance federates, and what its button should say.
+ */
+export interface OAuthStatus {
+  enabled: boolean
+  name?: string
+  label?: string
+  start_url?: string
+}
+
+/**
+ * OAuthProvider is the administrator's view. The client secret is never
+ * returned — `client_secret_set` reports only that one is stored.
+ */
+export interface OAuthProvider {
+  id: string
+  name: string
+  display_name?: string
+  client_id: string
+  client_secret_set: boolean
+  auth_url: string
+  token_url: string
+  user_info_url: string
+  scopes: string[]
+  subject_field: string
+  email_field: string
+  name_field: string
+  allowed_domains: string[]
+  allow_signup: boolean
+  default_role: Role
+  enabled: boolean
+  /** Derived from the instance base URL; this is what to register at the provider. */
+  redirect_uri: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SaveOAuthProviderRequest {
+  name: string
+  display_name: string
+  client_id: string
+  /** Empty keeps the stored secret, which is the only way to edit the rest. */
+  client_secret?: string
+  auth_url: string
+  token_url: string
+  user_info_url: string
+  scopes: string[]
+  subject_field: string
+  email_field: string
+  name_field: string
+  allowed_domains: string[]
+  allow_signup: boolean
+  default_role: Role
+  enabled: boolean
 }
 
 export interface TwoFactorStatus {

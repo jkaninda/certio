@@ -162,6 +162,14 @@ function roleBadge(role: string): string {
                     <span class="cell-title">
                       {{ user.name || user.email }}
                       <span v-if="user.id === auth.user?.id" class="badge badge-neutral you-badge">you</span>
+                      <span
+                        v-if="user.oauth_provider"
+                        class="badge badge-info you-badge"
+                        :title="`Signs in through ${user.oauth_provider}`"
+                      >
+                        <span class="mdi mdi-shield-account-outline" />
+                        {{ user.oauth_provider }}
+                      </span>
                     </span>
                     <span class="cell-sub">{{ user.email }}</span>
                   </span>
@@ -268,6 +276,10 @@ function roleBadge(role: string): string {
       <div class="form-group">
         <label class="form-label">New password</label>
         <input v-model="editForm.password" type="password" class="form-input" autocomplete="new-password" placeholder="Leave blank to keep it">
+        <p v-if="editing.oauth_provider" class="form-hint">
+          This account signs in through {{ editing.oauth_provider }} and has no password.
+          Setting one here adds a second way in, alongside the provider.
+        </p>
       </div>
 
       <template #footer>

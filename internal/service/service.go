@@ -46,6 +46,11 @@ type Service struct {
 	// no call site has to guard an increment; a CLI process simply builds one
 	// whose registry nobody scrapes.
 	Metrics *metrics.Metrics
+
+	// oauthStates holds the sign-ins currently away at the identity provider.
+	// It is per-instance rather than package-level so two servers in one test
+	// binary cannot answer each other's callbacks.
+	oauthStates *oauthStateStore
 }
 
 // New builds a Service.
@@ -54,11 +59,12 @@ func New(st *store.Store, keyring *certiocrypto.Keyring, cfg *config.Config, log
 		log = slog.Default()
 	}
 	svc := &Service{
-		Store:   st,
-		Keyring: keyring,
-		Config:  cfg,
-		Audit:   audit.New(st.Audit, log),
-		Log:     log,
+		Store:       st,
+		Keyring:     keyring,
+		Config:      cfg,
+		Audit:       audit.New(st.Audit, log),
+		Log:         log,
+		oauthStates: newOAuthStateStore(),
 	}
 	// The collector reads through the service that owns it, so the snapshot
 	// sees exactly the state every other operation does.

@@ -37,6 +37,7 @@ type Store struct {
 	ACME          *ACMERepo
 	Sessions      *SessionRepo
 	Settings      *SettingRepo
+	OAuth         *OAuthRepo
 }
 
 // Open connects to the configured database and wires up the repositories.
@@ -104,6 +105,7 @@ func New(db *gorm.DB) *Store {
 	s.ACME = &ACMERepo{db: db}
 	s.Sessions = &SessionRepo{db: db}
 	s.Settings = &SettingRepo{db: db}
+	s.OAuth = &OAuthRepo{db: db}
 	return s
 }
 
@@ -173,7 +175,7 @@ func (s *Store) Migrate() error {
 		&Authority{}, &Certificate{}, &Revocation{},
 		&User{}, &APIToken{}, &AuditLog{},
 		&Notification{}, &Delivery{}, &DeploymentTarget{},
-		&Job{}, &Setting{}, &RevokedSession{},
+		&Job{}, &Setting{}, &RevokedSession{}, &OAuthProvider{},
 		&ACMEAccount{}, &ACMEExternalAccount{}, &ACMEOrder{},
 		&ACMEAuthorization{}, &ACMEChallenge{}, &ACMENonce{},
 	}

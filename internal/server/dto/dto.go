@@ -148,6 +148,104 @@ type RefreshBody struct {
 	RefreshToken string `json:"refresh_token" required:"true"`
 }
 
+// ---- Single sign-on ---------------------------------------------------------
+
+// OAuthStatusResponse is what the sign-in page needs to decide whether to draw
+// a single sign-on button, and what to write on it. It is deliberately the
+// only unauthenticated view of the provider: an instance that has federated
+// says so, and says nothing else.
+type OAuthStatusResponse struct {
+	Enabled bool `json:"enabled"`
+	// Name is the provider identifier, e.g. "keycloak". Label is what the
+	// button should say.
+	Name  string `json:"name,omitempty"`
+	Label string `json:"label,omitempty"`
+	// StartURL is where to send the browser to begin a sign-in.
+	StartURL string `json:"start_url,omitempty"`
+}
+
+// OAuthProviderResponse is the administrator's view of the configuration. The
+// client secret is absent by construction — it is sealed with the master key
+// and there is no route that returns it.
+type OAuthProviderResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name,omitempty"`
+	ClientID    string `json:"client_id"`
+	// ClientSecretSet reports that a secret is stored, so the form can show
+	// "leave blank to keep the current secret" rather than an empty field that
+	// looks like nothing is configured.
+	ClientSecretSet bool `json:"client_secret_set"`
+
+	AuthURL     string   `json:"auth_url"`
+	TokenURL    string   `json:"token_url"`
+	UserInfoURL string   `json:"user_info_url"`
+	Scopes      []string `json:"scopes"`
+
+	SubjectField string `json:"subject_field"`
+	EmailField   string `json:"email_field"`
+	NameField    string `json:"name_field"`
+
+	AllowedDomains []string `json:"allowed_domains"`
+	AllowSignup    bool     `json:"allow_signup"`
+	DefaultRole    string   `json:"default_role"`
+	Enabled        bool     `json:"enabled"`
+
+	// RedirectURI is derived from the instance base URL and is what has to be
+	// registered at the provider. It is returned rather than configured so the
+	// two cannot disagree.
+	RedirectURI string `json:"redirect_uri"`
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// NewOAuthProviderResponse maps the stored provider onto its API shape.
+func NewOAuthProviderResponse(p *store.OAuthProvider, redirectURI string) OAuthProviderResponse {
+	return OAuthProviderResponse{
+		ID: p.ID, Name: p.Name, DisplayName: p.DisplayName,
+		ClientID:        p.ClientID,
+		ClientSecretSet: len(p.ClientSecretEncrypted) > 0,
+		AuthURL:         p.AuthURL, TokenURL: p.TokenURL, UserInfoURL: p.UserInfoURL,
+		Scopes:       valueOrEmpty(p.Scopes.Data),
+		SubjectField: p.SubjectField, EmailField: p.EmailField, NameField: p.NameField,
+		AllowedDomains: valueOrEmpty(p.AllowedDomains.Data),
+		AllowSignup:    p.AllowSignup, DefaultRole: p.DefaultRole, Enabled: p.Enabled,
+		RedirectURI: redirectURI,
+		CreatedAt:   p.CreatedAt, UpdatedAt: p.UpdatedAt,
+	}
+}
+
+// SaveOAuthProviderBody configures federated sign-in. There is one provider
+// per instance, so this replaces whatever is there rather than adding to it.
+type SaveOAuthProviderBody struct {
+	Name        string `json:"name" required:"true" minLength:"2" description:"Provider identifier, e.g. keycloak" example:"keycloak"`
+	DisplayName string `json:"display_name,omitempty" description:"What the sign-in button says" example:"Company SSO"`
+
+	ClientID     string `json:"client_id" required:"true" description:"OAuth 2.0 client ID"`
+	ClientSecret string `json:"client_secret,omitempty" description:"OAuth 2.0 client secret; leave empty to keep the stored one"`
+
+	AuthURL     string   `json:"auth_url" required:"true" description:"Authorization endpoint"`
+	TokenURL    string   `json:"token_url" required:"true" description:"Token endpoint"`
+	UserInfoURL string   `json:"user_info_url" required:"true" description:"Userinfo endpoint"`
+	Scopes      []string `json:"scopes,omitempty" description:"Requested scopes; defaults to openid, email and profile"`
+
+	SubjectField string `json:"subject_field,omitempty" description:"Userinfo field holding the stable user ID (default: sub)"`
+	EmailField   string `json:"email_field,omitempty" description:"Userinfo field holding the email address (default: email)"`
+	NameField    string `json:"name_field,omitempty" description:"Userinfo field holding the display name (default: name)"`
+
+	AllowedDomains []string `json:"allowed_domains,omitempty" description:"Restrict sign-in to these email domains; empty allows any"`
+	AllowSignup    bool     `json:"allow_signup" description:"Create an account the first time an identity signs in"`
+	DefaultRole    string   `json:"default_role,omitempty" enum:"admin,operator,viewer" description:"Role given to a provisioned account (default: viewer)"`
+	Enabled        bool     `json:"enabled" description:"Whether the provider may be used to sign in"`
+}
+
+// OAuthCallbackBody carries what the provider handed back to the browser.
+type OAuthCallbackBody struct {
+	Code  string `json:"code" required:"true" description:"Authorization code from the provider"`
+	State string `json:"state" required:"true" description:"The state Certio issued when the sign-in began"`
+}
+
 // TokenResponse is what a successful login or refresh returns.
 type TokenResponse struct {
 	AccessToken  string       `json:"access_token"`
@@ -161,14 +259,18 @@ type TokenResponse struct {
 // UserResponse is an account as the API returns it — never with a hash, and
 // never with the second factor's shared secret.
 type UserResponse struct {
-	ID               string     `json:"id"`
-	Email            string     `json:"email"`
-	Name             string     `json:"name"`
-	Role             string     `json:"role"`
-	Status           string     `json:"status"`
-	TwoFactorEnabled bool       `json:"two_factor_enabled"`
-	LastLoginAt      *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
+	ID               string `json:"id"`
+	Email            string `json:"email"`
+	Name             string `json:"name"`
+	Role             string `json:"role"`
+	Status           string `json:"status"`
+	TwoFactorEnabled bool   `json:"two_factor_enabled"`
+	// OAuthProvider names the identity provider this account signs in through,
+	// and is absent for a local one. The dashboard shows it so an
+	// administrator can tell at a glance which accounts have no password.
+	OAuthProvider string     `json:"oauth_provider,omitempty"`
+	LastLoginAt   *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // NewUserResponse maps a stored user onto its API shape.
@@ -176,7 +278,8 @@ func NewUserResponse(u *store.User) UserResponse {
 	return UserResponse{
 		ID: u.ID, Email: u.Email, Name: u.Name, Role: u.Role,
 		Status: u.Status, TwoFactorEnabled: u.HasTwoFactor(),
-		LastLoginAt: u.LastLoginAt, CreatedAt: u.CreatedAt,
+		OAuthProvider: u.OAuthProvider,
+		LastLoginAt:   u.LastLoginAt, CreatedAt: u.CreatedAt,
 	}
 }
 

@@ -13,6 +13,7 @@ const tabs = computed(() =>
     { path: '/settings/tokens', label: 'API tokens', adminOnly: false },
     { path: '/settings/notifications', label: 'Notifications', adminOnly: true },
     { path: '/settings/deployments', label: 'Deployments', adminOnly: true },
+    { path: '/settings/oauth', label: 'Single sign-on', adminOnly: true },
     { path: '/settings/acme', label: 'ACME', adminOnly: true },
   ].filter((tab) => !tab.adminOnly || auth.isAdmin),
 )

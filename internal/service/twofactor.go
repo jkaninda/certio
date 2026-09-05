@@ -155,7 +155,7 @@ func (s *Service) ConfirmTOTPEnrollment(actor audit.Actor, userID, code string) 
 	s.Audit.Record(actor, audit.Entry{
 		Action: audit.ActionTwoFactorEnabled, ResourceType: audit.ResourceUser,
 		ResourceID: user.ID, ResourceName: user.Email,
-		Metadata: map[string]any{"method": "totp", "recovery_codes": len(codes)},
+		Metadata: map[string]any{metaMethod: "totp", "recovery_codes": len(codes)},
 	})
 	return codes, nil
 }
