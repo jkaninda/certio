@@ -29,6 +29,19 @@ const (
 	tokenTypeChallenge = "2fa"
 )
 
+// Audit metadata keys used by the sign-in paths. They end up in exported audit
+// trails and in operators' alerting rules, so they are named once rather than
+// spelled out at each call site.
+const (
+	metaMethod   = "method"
+	metaProvider = "provider"
+
+	// methodOAuth marks a sign-in that came through the identity provider.
+	// Federated sign-ins are recorded as ActionLogin like any other, so a rule
+	// watching for logins keeps working when an instance federates.
+	methodOAuth = "oauth"
+)
+
 // challengeTTL is how long a user has to enter their second factor after the
 // password step. Long enough to fetch a phone, short enough that a leaked
 // challenge is worthless by the time it is found.
@@ -225,30 +238,18 @@ func PrincipalFromClaims(claims jwt.MapClaims) (*Principal, error) {
 	return principal, nil
 }
 
-// LoginResult is the outcome of a sign-in attempt. Exactly one of Tokens and
-// Challenge is set: an account with a second factor gets a challenge to
-// exchange, everyone else gets a session straight away.
 type LoginResult struct {
 	Tokens *TokenPair
 	User   *store.User
 
-	// TwoFactorRequired means the password was right but a code is still owed.
-	TwoFactorRequired bool
-	// Challenge is the short-lived token to present at the verify endpoint.
-	Challenge string
-	// ChallengeExpiresIn is that token's lifetime, in seconds.
+	TwoFactorRequired  bool
+	Challenge          string
 	ChallengeExpiresIn int
 
-	// UsedRecoveryCode reports that a single-use code was spent to get in, so
-	// the caller can tell the user to enrol a new device.
-	UsedRecoveryCode bool
-	// RecoveryCodesRemaining is how many unspent codes are left afterwards.
+	UsedRecoveryCode       bool
 	RecoveryCodesRemaining int
 }
 
-// LoginInput carries the credentials of a sign-in attempt. TOTPCode is
-// optional: a browser leaves it empty and answers the challenge instead, while
-// a script can supply it up front and complete the login in one request.
 type LoginInput struct {
 	Email    string
 	Password string
@@ -260,8 +261,7 @@ type LoginInput struct {
 func (s *Service) Login(actor audit.Actor, auth *Authenticator, in LoginInput) (*LoginResult, error) {
 	user, err := s.Store.Users.GetByEmail(in.Email)
 	if err != nil {
-		// Hash anyway so a missing account and a wrong password take the same
-		// time — otherwise the endpoint leaks which emails exist.
+
 		_ = certiocrypto.VerifyPassword(in.Password, dummyHash)
 		s.Audit.RecordFailure(actor, audit.Entry{
 			Action: audit.ActionLoginFailed, ResourceType: audit.ResourceUser, ResourceName: in.Email,
@@ -269,7 +269,11 @@ func (s *Service) Login(actor audit.Actor, auth *Authenticator, in LoginInput) (
 		return nil, ErrInvalidCredentials
 	}
 
-	if err := certiocrypto.VerifyPassword(in.Password, user.PasswordHash); err != nil {
+	hash := user.PasswordHash
+	if hash == "" {
+		hash = dummyHash
+	}
+	if err := certiocrypto.VerifyPassword(in.Password, hash); err != nil || user.PasswordHash == "" {
 		s.Audit.RecordFailure(actor, audit.Entry{
 			Action: audit.ActionLoginFailed, ResourceType: audit.ResourceUser,
 			ResourceID: user.ID, ResourceName: user.Email,
@@ -321,8 +325,7 @@ func (s *Service) CompleteTwoFactorLogin(actor audit.Actor, auth *Authenticator,
 	if !user.IsActive() {
 		return nil, ErrAccountDisabled
 	}
-	// The factor could have been removed between the two steps, in which case
-	// the password alone was already enough.
+
 	if !user.HasTwoFactor() {
 		return s.completeLogin(actor, auth, user, "")
 	}
@@ -331,8 +334,7 @@ func (s *Service) CompleteTwoFactorLogin(actor audit.Actor, auth *Authenticator,
 }
 
 // completeLogin verifies the second factor when there is one and issues the
-// token pair. It is the single place a session is minted, so the audit entry
-// and the login timestamp cannot drift apart from the tokens.
+// token pair.
 func (s *Service) completeLogin(actor audit.Actor, auth *Authenticator, user *store.User, code string) (*LoginResult, error) {
 	actor.ID, actor.Name, actor.Type = user.ID, user.Email, store.ActorUser
 
@@ -344,6 +346,29 @@ func (s *Service) completeLogin(actor audit.Actor, auth *Authenticator, user *st
 			return nil, err
 		}
 	}
+
+	metadata := map[string]any{}
+	if user.HasTwoFactor() {
+		method := "totp"
+		if usedRecovery {
+			method = "recovery_code"
+		}
+		metadata["second_factor"] = method
+	}
+
+	result, err := s.issueSession(actor, auth, user, metadata)
+	if err != nil {
+		return nil, err
+	}
+	result.UsedRecoveryCode = usedRecovery
+	result.RecoveryCodesRemaining = user.RecoveryCodesRemaining()
+	return result, nil
+}
+
+func (s *Service) issueSession(
+	actor audit.Actor, auth *Authenticator, user *store.User, metadata map[string]any,
+) (*LoginResult, error) {
+	actor.ID, actor.Name, actor.Type = user.ID, user.Email, store.ActorUser
 
 	pair, err := auth.Issue(user)
 	if err != nil {
@@ -357,20 +382,12 @@ func (s *Service) completeLogin(actor audit.Actor, auth *Authenticator, user *st
 		Action: audit.ActionLogin, ResourceType: audit.ResourceUser,
 		ResourceID: user.ID, ResourceName: user.Email,
 	}
-	if user.HasTwoFactor() {
-		method := "totp"
-		if usedRecovery {
-			method = "recovery_code"
-		}
-		entry.Metadata = map[string]any{"second_factor": method}
+	if len(metadata) > 0 {
+		entry.Metadata = metadata
 	}
 	s.Audit.Record(actor, entry)
 
-	return &LoginResult{
-		Tokens: pair, User: user,
-		UsedRecoveryCode:       usedRecovery,
-		RecoveryCodesRemaining: user.RecoveryCodesRemaining(),
-	}, nil
+	return &LoginResult{Tokens: pair, User: user}, nil
 }
 
 // dummyHash is a valid Argon2id hash of a random value, used so a login
@@ -390,8 +407,6 @@ func (s *Service) Refresh(auth *Authenticator, refreshToken string) (*TokenPair,
 	sub, _ := claims["sub"].(string)
 	sid, _ := claims["sid"].(string)
 
-	// A refresh token from a session that has been signed out must not mint a
-	// new pair — that would be the one hole a denylist exists to close.
 	if revoked, err := s.Store.Sessions.IsRevoked(sid, sub); err != nil {
 		return nil, nil, err
 	} else if revoked {

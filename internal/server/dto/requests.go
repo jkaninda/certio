@@ -49,6 +49,16 @@ type TwoFactorDisableRequest struct {
 	Body TwoFactorDisableBody `json:"body"`
 }
 
+// SaveOAuthProviderRequest configures federated sign-in.
+type SaveOAuthProviderRequest struct {
+	Body SaveOAuthProviderBody `json:"body"`
+}
+
+// OAuthCallbackRequest exchanges an authorization code for a session.
+type OAuthCallbackRequest struct {
+	Body OAuthCallbackBody `json:"body"`
+}
+
 // ---- Users and tokens -------------------------------------------------------
 
 // ListUsersRequest is a page of accounts.

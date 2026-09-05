@@ -29,6 +29,7 @@ const (
 	tagTrust       = "Trust"
 	tagAuth        = "Authentication"
 	tagTwoFactor   = "Two-factor authentication"
+	tagOAuth       = "Single sign-on"
 	tagAuthorities = "Authorities"
 	tagCerts       = "Certificates"
 	tagUsers       = "Users"
@@ -97,6 +98,7 @@ func (s *Server) routes(opts Options) {
 	s.app.Register(s.trustRoutes(g)...)
 	s.app.Register(s.authRoutes(g)...)
 	s.app.Register(s.twoFactorRoutes(g)...)
+	s.app.Register(s.oauthRoutes(g)...)
 	s.app.Register(s.authorityRoutes(g)...)
 	s.app.Register(s.certificateRoutes(g)...)
 	s.app.Register(s.userRoutes(g)...)
@@ -367,6 +369,98 @@ func (s *Server) twoFactorRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.TwoFactorCodeRequest{},
 			Response:    &dto.RecoveryCodesResponse{},
 			Options:     []okapi.RouteOption{okapi.DocErrorResponse(401, &dto.ErrorResponse{})},
+		},
+	}
+}
+
+// oauthRoutes registers federated sign-in: three public endpoints that make up
+// the flow, and three administrator endpoints that configure it.
+func (s *Server) oauthRoutes(g groups) []okapi.RouteDefinition {
+	h := s.handler
+	tag := []string{tagOAuth}
+	read := middleware.Admin(service.ScopeSettingsRead)
+	admin := middleware.Admin(service.ScopeSettingsWrite)
+
+	return []okapi.RouteDefinition{
+		{
+			Method:  http.MethodGet,
+			Path:    "/oauth",
+			Handler: h.OAuthStatus,
+			Group:   g.auth,
+			Tags:    tag,
+			Summary: "Whether this instance offers single sign-on",
+			Description: "Unauthenticated, because the page that asks is the sign-in page. It reports " +
+				"only whether a provider is configured and enabled, and what its button should say.",
+			Response: &dto.OAuthStatusResponse{},
+		},
+		{
+			Method:  http.MethodGet,
+			Path:    "/oauth/authorize",
+			Handler: h.OAuthAuthorize,
+			Group:   g.auth,
+			Tags:    tag,
+			Summary: "Begin a single sign-on and redirect to the provider",
+			Description: "Mints the CSRF state and the PKCE verifier server-side and returns a 302. " +
+				"Neither the verifier nor anything derived from it beyond the S256 challenge reaches " +
+				"the browser, so an intercepted authorization code is not enough to complete a sign-in.",
+			Options: []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+		},
+		{
+			Method:  http.MethodPost,
+			Path:    "/oauth/callback",
+			Handler: okapi.H(h.OAuthCallback),
+			Group:   g.auth,
+			Tags:    tag,
+			Summary: "Exchange the provider's authorization code for a session",
+			Description: "The reply is the same shape a password sign-in returns, two-factor challenge " +
+				"included: an identity provider says who somebody is, and does not retire the second " +
+				"factor they enrolled.",
+			Request:  &dto.OAuthCallbackRequest{},
+			Response: &dto.LoginResponse{},
+			Options: []okapi.RouteOption{
+				okapi.DocErrorResponse(401, &dto.ErrorResponse{}),
+				okapi.DocErrorResponse(403, &dto.ErrorResponse{}),
+				okapi.DocErrorResponse(404, &dto.ErrorResponse{}),
+			},
+		},
+		{
+			Method:      http.MethodGet,
+			Path:        "/oauth-provider",
+			Handler:     h.GetOAuthProvider,
+			Group:       g.api,
+			Tags:        tag,
+			Summary:     "The single sign-on configuration",
+			Description: "The client secret is sealed with the master key and is never returned.",
+			Response:    &dto.OAuthProviderResponse{},
+			Middlewares: read,
+			Options:     []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+		},
+		{
+			Method:  http.MethodPut,
+			Path:    "/oauth-provider",
+			Handler: okapi.H(h.SaveOAuthProvider),
+			Group:   g.api,
+			Tags:    tag,
+			Summary: "Configure single sign-on",
+			Description: "There is one provider per instance, so this replaces the configuration rather " +
+				"than adding to it. Leave client_secret empty to keep the stored one. Register the " +
+				"redirect_uri from the response at the provider.",
+			Request:     &dto.SaveOAuthProviderRequest{},
+			Response:    &dto.OAuthProviderResponse{},
+			Middlewares: admin,
+			Options:     []okapi.RouteOption{okapi.DocErrorResponse(400, &dto.ErrorResponse{})},
+		},
+		{
+			Method:  http.MethodDelete,
+			Path:    "/oauth-provider",
+			Handler: h.DeleteOAuthProvider,
+			Group:   g.api,
+			Tags:    tag,
+			Summary: "Remove single sign-on",
+			Description: "Accounts the provider created are kept: they own certificates, and withdrawing " +
+				"a way in is not a reason to lose the record of who issued what.",
+			Response:    &dto.MessageResponse{},
+			Middlewares: admin,
 		},
 	}
 }

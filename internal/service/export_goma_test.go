@@ -96,13 +96,24 @@ func TestGomaRouteConfig(t *testing.T) {
 		"      backends:",
 		"        - endpoint:",
 		"      tls:",
-		"        certificates:",
-		"          - cert: /etc/goma/certs/jkaninda.dev-fullchain.pem",
-		"            key: /etc/goma/certs/jkaninda.dev.key",
+		// Singular and a mapping: a route carries one certificate. The list
+		// form belongs to the gateway-wide block, and Goma would not bind it
+		// here.
+		"        certificate:",
+		"          cert: /etc/goma/certs/jkaninda.dev-fullchain.pem",
+		"          key: /etc/goma/certs/jkaninda.dev.key",
+		// Otherwise a gateway with a certificate manager would also order an
+		// ACME certificate for these hosts.
+		"        provider: none",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the Goma route config is missing %q:\n%s", want, out)
 		}
+	}
+
+	// The list form is what this used to emit and what Goma rejects here.
+	if strings.Contains(out, "        certificates:") {
+		t.Errorf("the route block uses the gateway-wide list form:\n%s", out)
 	}
 
 	// Hosts must be a quoted flow sequence: an unquoted wildcard is invalid YAML.
@@ -128,13 +139,18 @@ func TestGomaRouteMentionsMutualTLSForPeerProfiles(t *testing.T) {
 		t.Error("a server-profile route suggests mutual TLS")
 	}
 
-	// A peer certificate carries clientAuth, so the snippet points at it.
+	// A peer certificate carries clientAuth, so the snippet points at it —
+	// both the route knob for presenting it to the backend and the
+	// gateway-wide one for verifying callers, which are different settings and
+	// were previously conflated.
 	peerCert, peerBundle := gomaFixture(t, s, pki.ProfilePeer)
 	peerOut, err := s.ExportCertificate(peerCert, peerBundle, ExportOptions{Format: FormatGomaRoute})
 	if err != nil {
 		t.Fatalf("ExportCertificate: %v", err)
 	}
-	if !strings.Contains(string(peerOut.Data), "rootCAs") {
-		t.Errorf("a peer-profile route does not mention mutual TLS:\n%s", peerOut.Data)
+	for _, want := range []string{"clientCert:", "clientKey:", "rootCAs:", "clientAuth:", "clientCA:"} {
+		if !strings.Contains(string(peerOut.Data), want) {
+			t.Errorf("a peer-profile route does not mention %q:\n%s", want, peerOut.Data)
+		}
 	}
 }

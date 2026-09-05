@@ -18,6 +18,11 @@ const (
 	ActionTokenIssued  = "auth.token_issued"  //nolint:gosec // G101: an action name, not a credential
 	ActionTokenRevoked = "auth.token_revoked" //nolint:gosec // G101: an action name, not a credential
 
+	ActionOAuthConfigured  = "auth.oauth_configured"
+	ActionOAuthRemoved     = "auth.oauth_removed"
+	ActionOAuthProvisioned = "auth.oauth_provisioned"
+	ActionOAuthLinked      = "auth.oauth_linked"
+
 	ActionTwoFactorEnabled     = "auth.2fa_enabled"
 	ActionTwoFactorDisabled    = "auth.2fa_disabled"
 	ActionTwoFactorFailed      = "auth.2fa_failed"
@@ -75,6 +80,7 @@ const (
 	ResourceACMEAccount  = "acme_account"
 	ResourceACMEExternal = "acme_external_account"
 	ResourceSetting      = "setting"
+	ResourceOAuth        = "oauth_provider"
 	ResourceJob          = "job"
 )
 
