@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+// NameConstraints is the RFC 5280 name constraint set carried by a CA: each
+// name form has a permitted and an excluded list, and an empty permitted list
+// means the form is unrestricted.
 type NameConstraints struct {
 	PermittedDNS   []string `json:"permitted_dns,omitempty"`
 	ExcludedDNS    []string `json:"excluded_dns,omitempty"`
@@ -70,6 +73,9 @@ func (n NameConstraints) IPNets() (permitted, excluded []*net.IPNet, err error) 
 	return permitted, excluded, nil
 }
 
+// PermitsDNS reports whether a DNS name satisfies the constraints. The name is
+// matched case-insensitively, with a trailing dot and a leading wildcard label
+// stripped first.
 func (n NameConstraints) PermitsDNS(name string) bool {
 	name = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(name), "."))
 

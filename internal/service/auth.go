@@ -238,6 +238,8 @@ func PrincipalFromClaims(claims jwt.MapClaims) (*Principal, error) {
 	return principal, nil
 }
 
+// LoginResult is the outcome of a sign-in attempt: either a token pair, or —
+// when the account carries a second factor — a challenge to exchange for one.
 type LoginResult struct {
 	Tokens *TokenPair
 	User   *store.User
@@ -250,6 +252,8 @@ type LoginResult struct {
 	RecoveryCodesRemaining int
 }
 
+// LoginInput carries the credentials of a password sign-in. TOTPCode is empty
+// on the first step and set when answering a two-factor challenge.
 type LoginInput struct {
 	Email    string
 	Password string
