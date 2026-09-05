@@ -72,6 +72,8 @@ func (h *Handler) GetOAuthProvider(c *okapi.Context) error {
 	return c.OK(dto.NewOAuthProviderResponse(provider, h.Service.OAuthRedirectURI()))
 }
 
+// SaveOAuthProvider creates or replaces the single sign-on configuration and
+// returns the administrator's view of it.
 func (h *Handler) SaveOAuthProvider(c *okapi.Context, req *dto.SaveOAuthProviderRequest) error {
 	in := req.Body
 	provider, err := h.Service.SaveOAuthProvider(h.actor(c), service.OAuthProviderInput{
@@ -97,6 +99,8 @@ func (h *Handler) SaveOAuthProvider(c *okapi.Context, req *dto.SaveOAuthProvider
 	return c.OK(dto.NewOAuthProviderResponse(provider, h.Service.OAuthRedirectURI()))
 }
 
+// DeleteOAuthProvider removes the single sign-on configuration, leaving
+// password login as the only way in.
 func (h *Handler) DeleteOAuthProvider(c *okapi.Context) error {
 	if err := h.Service.DeleteOAuthProvider(h.actor(c)); err != nil {
 		return h.fail(c, err)

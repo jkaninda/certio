@@ -21,8 +21,14 @@ import (
 	"github.com/jkaninda/certio/internal/store"
 )
 
+// ErrOAuthNotConfigured is returned when a single sign-on flow is attempted
+// but no provider is configured, or the configured one is disabled.
 var ErrOAuthNotConfigured = errors.New("single sign-on is not configured on this instance")
 
+// ErrOAuthDenied is returned when the provider authenticated someone this
+// instance will not admit: an unusable profile, an unverified or off-domain
+// email address, or an unknown account where automatic signup is off. It is
+// wrapped with the specific reason.
 var ErrOAuthDenied = errors.New("this account may not sign in")
 
 const (
@@ -108,6 +114,8 @@ func randomURLSafe(n int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
+// OAuthProviderInput describes the single sign-on configuration to store. An
+// empty ClientSecret leaves the stored secret untouched.
 type OAuthProviderInput struct {
 	Name         string
 	DisplayName  string
@@ -147,6 +155,8 @@ func (s *Service) enabledOAuthProvider() (*store.OAuthProvider, error) {
 	return provider, nil
 }
 
+// SaveOAuthProvider validates the input and creates or replaces the instance's
+// single sign-on configuration, recording the change in the audit trail.
 func (s *Service) SaveOAuthProvider(actor audit.Actor, in OAuthProviderInput) (*store.OAuthProvider, error) {
 	name := strings.ToLower(strings.TrimSpace(in.Name))
 	if name == "" {
@@ -248,6 +258,8 @@ func (s *Service) DeleteOAuthProvider(actor audit.Actor) error {
 	return nil
 }
 
+// OAuthRedirectURI returns the callback URL to register with the provider,
+// derived from the configured server base URL.
 func (s *Service) OAuthRedirectURI() string {
 	if s.Config == nil {
 		return ""
@@ -330,6 +342,10 @@ func (s *Service) StartOAuth() (string, error) {
 	return provider.AuthURL + separator + query.Encode(), nil
 }
 
+// LoginWithOAuth redeems the state issued by the authorization step, exchanges
+// the code for the caller's profile, and signs them in — provisioning an
+// account when the provider allows signup. It returns ErrOAuthDenied when the
+// profile is not admissible.
 func (s *Service) LoginWithOAuth(
 	ctx context.Context, actor audit.Actor, auth *Authenticator, code, state string,
 ) (*LoginResult, error) {
