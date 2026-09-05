@@ -186,10 +186,11 @@ type OAuthProviderResponse struct {
 	EmailField   string `json:"email_field"`
 	NameField    string `json:"name_field"`
 
-	AllowedDomains []string `json:"allowed_domains"`
-	AllowSignup    bool     `json:"allow_signup"`
-	DefaultRole    string   `json:"default_role"`
-	Enabled        bool     `json:"enabled"`
+	AllowedDomains       []string `json:"allowed_domains"`
+	AllowSignup          bool     `json:"allow_signup"`
+	AllowUnverifiedEmail bool     `json:"allow_unverified_email"`
+	DefaultRole          string   `json:"default_role"`
+	Enabled              bool     `json:"enabled"`
 
 	// RedirectURI is derived from the instance base URL and is what has to be
 	// registered at the provider. It is returned rather than configured so the
@@ -210,7 +211,8 @@ func NewOAuthProviderResponse(p *store.OAuthProvider, redirectURI string) OAuthP
 		Scopes:       valueOrEmpty(p.Scopes.Data),
 		SubjectField: p.SubjectField, EmailField: p.EmailField, NameField: p.NameField,
 		AllowedDomains: valueOrEmpty(p.AllowedDomains.Data),
-		AllowSignup:    p.AllowSignup, DefaultRole: p.DefaultRole, Enabled: p.Enabled,
+		AllowSignup:    p.AllowSignup, AllowUnverifiedEmail: p.AllowUnverifiedEmail,
+		DefaultRole: p.DefaultRole, Enabled: p.Enabled,
 		RedirectURI: redirectURI,
 		CreatedAt:   p.CreatedAt, UpdatedAt: p.UpdatedAt,
 	}
@@ -234,10 +236,11 @@ type SaveOAuthProviderBody struct {
 	EmailField   string `json:"email_field,omitempty" description:"Userinfo field holding the email address (default: email)"`
 	NameField    string `json:"name_field,omitempty" description:"Userinfo field holding the display name (default: name)"`
 
-	AllowedDomains []string `json:"allowed_domains,omitempty" description:"Restrict sign-in to these email domains; empty allows any"`
-	AllowSignup    bool     `json:"allow_signup" description:"Create an account the first time an identity signs in"`
-	DefaultRole    string   `json:"default_role,omitempty" enum:"admin,operator,viewer" description:"Role given to a provisioned account (default: viewer)"`
-	Enabled        bool     `json:"enabled" description:"Whether the provider may be used to sign in"`
+	AllowedDomains       []string `json:"allowed_domains,omitempty" description:"Restrict sign-in to these email domains; empty allows any"`
+	AllowSignup          bool     `json:"allow_signup" description:"Create an account the first time an identity signs in"`
+	AllowUnverifiedEmail bool     `json:"allow_unverified_email" description:"Accept identities the provider reports as having an unverified email address"`
+	DefaultRole          string   `json:"default_role,omitempty" enum:"admin,operator,viewer" description:"Role given to a provisioned account (default: viewer)"`
+	Enabled              bool     `json:"enabled" description:"Whether the provider may be used to sign in"`
 }
 
 // OAuthCallbackBody carries what the provider handed back to the browser.

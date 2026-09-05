@@ -305,6 +305,23 @@ func TestOAuthRefusesToLinkAnUnverifiedAddress(t *testing.T) {
 	}
 }
 
+func TestOAuthAcceptsAnUnverifiedAddressWhenAllowed(t *testing.T) {
+	s := newTestService(t)
+	idp := newFakeIdP(t)
+	idp.configure(t, s, func(in *OAuthProviderInput) { in.AllowUnverifiedEmail = true })
+	idp.userinfo["email_verified"] = false
+
+	// A directory that never checks the address is the whole reason the switch
+	// exists: with it on, the same sign-in that was denied above goes through.
+	result, err := signIn(t, s, testAuthenticator())
+	if err != nil {
+		t.Fatalf("LoginWithOAuth: %v", err)
+	}
+	if result.User.Email != "ada@example.com" {
+		t.Errorf("email = %q, want the provisioned address", result.User.Email)
+	}
+}
+
 func TestOAuthEnforcesAllowedDomains(t *testing.T) {
 	s := newTestService(t)
 	idp := newFakeIdP(t)

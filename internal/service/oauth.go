@@ -130,10 +130,11 @@ type OAuthProviderInput struct {
 	EmailField   string
 	NameField    string
 
-	AllowedDomains []string
-	AllowSignup    bool
-	DefaultRole    string
-	Enabled        bool
+	AllowedDomains       []string
+	AllowSignup          bool
+	AllowUnverifiedEmail bool
+	DefaultRole          string
+	Enabled              bool
 }
 
 // OAuthProvider returns the configured provider, or ErrNotFound when sign-in
@@ -197,8 +198,11 @@ func (s *Service) SaveOAuthProvider(actor audit.Actor, in OAuthProviderInput) (*
 		NameField:      strings.TrimSpace(in.NameField),
 		AllowedDomains: store.JSON(normalizeDomains(in.AllowedDomains)),
 		AllowSignup:    in.AllowSignup,
-		DefaultRole:    role,
-		Enabled:        in.Enabled,
+
+		AllowUnverifiedEmail: in.AllowUnverifiedEmail,
+
+		DefaultRole: role,
+		Enabled:     in.Enabled,
 	}
 	provider.ApplyDefaults()
 
@@ -231,10 +235,11 @@ func (s *Service) SaveOAuthProvider(actor audit.Actor, in OAuthProviderInput) (*
 		Action: audit.ActionOAuthConfigured, ResourceType: audit.ResourceOAuth,
 		ResourceID: provider.ID, ResourceName: provider.Name,
 		Metadata: map[string]any{
-			"enabled":         provider.Enabled,
-			"allow_signup":    provider.AllowSignup,
-			"default_role":    provider.DefaultRole,
-			"allowed_domains": provider.AllowedDomains.Data,
+			"enabled":                provider.Enabled,
+			"allow_signup":           provider.AllowSignup,
+			"allow_unverified_email": provider.AllowUnverifiedEmail,
+			"default_role":           provider.DefaultRole,
+			"allowed_domains":        provider.AllowedDomains.Data,
 		},
 	})
 	return provider, nil
@@ -595,8 +600,10 @@ func (s *Service) resolveOAuthUser(
 		return nil, err
 	}
 
-	if !profile.EmailVerified {
-		return nil, fmt.Errorf("%w: %s has not verified this email address", ErrOAuthDenied, provider.Label())
+	if !profile.EmailVerified && !provider.AllowUnverifiedEmail {
+		return nil, fmt.Errorf(
+			"%w: %s has not verified this email address; an administrator can accept unverified addresses in the single sign-on settings",
+			ErrOAuthDenied, provider.Label())
 	}
 
 	existing, err := s.Store.Users.GetByEmail(profile.Email)

@@ -378,6 +378,8 @@ type OAuthProvider struct {
 
 	AllowSignup bool `gorm:"not null" json:"allow_signup"`
 
+	AllowUnverifiedEmail bool `gorm:"not null" json:"allow_unverified_email"`
+
 	DefaultRole string `gorm:"size:20;not null;default:viewer" json:"default_role"`
 
 	Enabled bool `gorm:"not null" json:"enabled"`
