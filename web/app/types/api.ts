@@ -21,7 +21,7 @@
 // OpenAPI document at /openapi.json remains the authority.
 
 export type Role = 'admin' | 'operator' | 'viewer'
-export type Status = 'active' | 'expiring' | 'expired' | 'revoked' | 'disabled'
+export type Status = 'active' | 'expiring' | 'expired' | 'revoked' | 'held' | 'disabled'
 export type Severity = 'ok' | 'warning' | 'critical' | 'expired'
 export type SANType = 'dns' | 'ip' | 'email' | 'uri'
 export type Profile = 'server' | 'client' | 'peer' | 'code-signing' | 'intermediate' | 'root'
