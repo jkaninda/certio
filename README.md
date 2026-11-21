@@ -163,7 +163,12 @@ make build
 ```
 
 **Miabi** — one click from the
-[template marketplace](https://marketplace.miabi.io/templates/certio).
+[template marketplace](https://marketplace.miabi.io/templates/certio), or as code with the stack
+in [`examples/miabi`](examples/miabi):
+
+```sh
+miabi apply -f examples/miabi/stack.yaml
+```
 
 ## Quick start
 
@@ -203,7 +208,7 @@ Sign in, change the password, then delete that file. Bootstrap only ever runs on
 database, so a restart never resets credentials or regenerates the password.
 
 A complete deployment with file-based secrets is in
-[`examples/docker-compose.yml`](examples/docker-compose.yml).
+[`examples/compose/docker-compose.yml`](examples/compose/docker-compose.yml).
 
 ### 3. Create a CA and issue something
 

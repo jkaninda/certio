@@ -1,0 +1,101 @@
+# Certio on Miabi — a complete single-node deployment; setup steps are in README.md.
+#
+#   miabi apply -f stack.yaml --dry-run
+#   miabi apply -f stack.yaml
+---
+apiVersion: miabi.io/v1
+kind: Stack
+metadata: { name: certio }
+spec:
+  description: Certio — private PKI and TLS certificate management.
+---
+# Encrypts every stored private key. Certio needs 32 bytes, and Miabi generates
+# exactly `length` alphanumerics, so only 32 parses at boot. Back it up after
+# the first apply (see README.md): lose it or change it, and every stored
+# private key is unreadable.
+apiVersion: miabi.io/v1
+kind: Secret
+metadata: { name: certio-master-key }
+spec: { generate: true, length: 32, symbols: false }
+---
+# Signs dashboard and API sessions. Regenerating it only signs everyone out.
+apiVersion: miabi.io/v1
+kind: Secret
+metadata: { name: certio-jwt-secret }
+spec: { generate: true, length: 48, symbols: false }
+---
+# The first administrator's password, used once on an empty database.
+apiVersion: miabi.io/v1
+kind: Secret
+metadata: { name: certio-admin-password }
+spec: { generate: true, length: 24, symbols: false }
+---
+# Holds the SQLite database. Back it up together with the master key:
+# neither is any use without the other.
+apiVersion: miabi.io/v1
+kind: Volume
+metadata: { name: certio-data }
+spec: { size: 5Gi }
+---
+apiVersion: miabi.io/v1
+kind: Application
+metadata: { name: certio }
+spec:
+  stack: certio
+  image: jkaninda/certio
+  tag: "0.2.1"
+  ports:
+    - container: 8080
+      scheme: http
+  env:
+    # Refuses to boot without a real master key and JWT secret.
+    CERTIO_PRODUCTION: "true"
+
+    CERTIO_MASTER_KEY: "{{ .secrets.certio-master-key }}"
+    CERTIO_JWT_SECRET: "{{ .secrets.certio-jwt-secret }}"
+
+    CERTIO_DB_URL: sqlite:///data/certio.db
+
+    # Baked into the CRL distribution point of every certificate issued from
+    # here on, so it has to be the URL clients can actually reach.
+    CERTIO_BASE_URL: https://certio.example.com
+
+    # Creates the first administrator on an empty database, then never again.
+    CERTIO_ADMIN_EMAIL: admin@example.com
+    CERTIO_ADMIN_PASSWORD: "{{ .secrets.certio-admin-password }}"
+
+    CERTIO_DEFAULT_ORGANIZATION: Example Ltd
+    CERTIO_DEFAULT_COUNTRY: CD
+
+    # once | always | never — how often a private key may be downloaded.
+    CERTIO_KEY_DOWNLOAD_POLICY: always
+
+    CERTIO_SCHEDULER_ENABLED: "true"
+    CERTIO_SCHEDULER_INTERVAL: 1h
+    CERTIO_EXPIRY_WARN_DAYS: "30"
+
+    CERTIO_LOG_LEVEL: info
+    CERTIO_LOG_FORMAT: json
+  mounts:
+    - volume: certio-data
+      path: /data
+  # SQLite has one writer, so releases do not overlap.
+  deployment: { strategy: recreate }
+  healthcheck:
+    type: http
+    path: /health
+    port: 8080
+---
+apiVersion: miabi.io/v1
+kind: Domain
+metadata: { name: certio.example.com }
+spec:
+  tls: acme
+---
+apiVersion: miabi.io/v1
+kind: Route
+metadata: { name: certio-web }
+spec:
+  hosts: [certio.example.com]
+  app: certio
+  port: 8080
