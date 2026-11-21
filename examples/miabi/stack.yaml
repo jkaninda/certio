@@ -90,7 +90,8 @@ apiVersion: miabi.io/v1
 kind: Domain
 metadata: { name: certio.example.com }
 spec:
-  tls: acme
+  tls:
+    mode: acme       # acme | custom (default acme)
 ---
 apiVersion: miabi.io/v1
 kind: Route
