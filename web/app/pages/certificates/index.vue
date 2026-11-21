@@ -29,6 +29,7 @@ import type { BulkResponse, Certificate, PageMeta } from '~/types/api'
 useHead({ title: 'Certificates · Certio' })
 
 const api = useApi()
+const { openRow } = useRowLink()
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
@@ -45,6 +46,7 @@ const caFilter = ref((route.query.ca as string) ?? '')
 const statusFilter = ref((route.query.status as string) ?? '')
 const expiringFilter = ref((route.query.expiring_in as string) ?? '')
 const sort = ref((route.query.sort as string) ?? 'not_after')
+const order = ref<'asc' | 'desc'>(route.query.order === 'desc' ? 'desc' : 'asc')
 const page = ref(Number(route.query.page ?? 1))
 
 const selected = ref<Set<string>>(new Set())
@@ -61,7 +63,7 @@ async function load() {
       status: statusFilter.value,
       expiring_in: expiringFilter.value,
       sort: sort.value,
-      order: sort.value === 'not_after' ? 'asc' : 'desc',
+      order: order.value,
       page: page.value,
       limit: 25,
     })
@@ -88,6 +90,7 @@ function syncQuery() {
       ...(statusFilter.value ? { status: statusFilter.value } : {}),
       ...(expiringFilter.value ? { expiring_in: expiringFilter.value } : {}),
       ...(sort.value !== 'not_after' ? { sort: sort.value } : {}),
+      ...(order.value !== 'asc' ? { order: order.value } : {}),
       ...(page.value > 1 ? { page: String(page.value) } : {}),
     },
   })
@@ -102,7 +105,7 @@ watch(search, () => {
   }, 300)
 })
 
-watch([caFilter, statusFilter, expiringFilter, sort], () => {
+watch([caFilter, statusFilter, expiringFilter, sort, order], () => {
   page.value = 1
   syncQuery()
   load()
@@ -163,6 +166,29 @@ async function bulkRenew() {
   }
 }
 
+type SortKey = 'common_name' | 'not_after' | 'status'
+
+/** sortBy flips the direction on the current column, and starts a new one
+ *  ascending: A to Z, or soonest expiry first. */
+function sortBy(key: SortKey) {
+  if (sort.value === key) {
+    order.value = order.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sort.value = key
+    order.value = 'asc'
+  }
+}
+
+function ariaSort(key: SortKey) {
+  if (sort.value !== key) return 'none'
+  return order.value === 'asc' ? 'ascending' : 'descending'
+}
+
+function sortIcon(key: SortKey) {
+  if (sort.value !== key) return 'mdi-unfold-more-horizontal'
+  return order.value === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down'
+}
+
 function clearFilters() {
   search.value = ''
   caFilter.value = ''
@@ -207,6 +233,7 @@ const hasFilters = computed(
         <option value="expiring">Expiring</option>
         <option value="expired">Expired</option>
         <option value="revoked">Revoked</option>
+        <option value="held">Held</option>
       </select>
       <select v-model="expiringFilter" class="form-select" aria-label="Filter by expiry window">
         <option value="">Any expiry</option>
@@ -257,11 +284,26 @@ const hasFilters = computed(
                 <th v-if="auth.canWrite" class="checkbox-col">
                   <input type="checkbox" :checked="allSelected" aria-label="Select all" @change="toggleAll">
                 </th>
-                <th>Common name</th>
+                <th :aria-sort="ariaSort('common_name')">
+                  <button type="button" class="th-sort" :class="{ active: sort === 'common_name' }" @click="sortBy('common_name')">
+                    Common name
+                    <span class="mdi th-sort-icon" :class="sortIcon('common_name')" aria-hidden="true" />
+                  </button>
+                </th>
                 <th>Authority</th>
                 <th>Profile</th>
-                <th>Expires</th>
-                <th>Status</th>
+                <th :aria-sort="ariaSort('not_after')">
+                  <button type="button" class="th-sort" :class="{ active: sort === 'not_after' }" @click="sortBy('not_after')">
+                    Expires
+                    <span class="mdi th-sort-icon" :class="sortIcon('not_after')" aria-hidden="true" />
+                  </button>
+                </th>
+                <th :aria-sort="ariaSort('status')">
+                  <button type="button" class="th-sort" :class="{ active: sort === 'status' }" @click="sortBy('status')">
+                    Status
+                    <span class="mdi th-sort-icon" :class="sortIcon('status')" aria-hidden="true" />
+                  </button>
+                </th>
                 <th />
               </tr>
             </thead>
@@ -270,7 +312,7 @@ const hasFilters = computed(
                 v-for="cert in items"
                 :key="cert.id"
                 class="row-clickable"
-                @click="navigateTo(`/certificates/${cert.id}`)"
+                @click="openRow($event, `/certificates/${cert.id}`)"
               >
                 <td v-if="auth.canWrite" class="checkbox-col" @click.stop>
                   <input
@@ -284,7 +326,9 @@ const hasFilters = computed(
                   <div class="cell-id">
                     <span class="avatar avatar-sm avatar-square">{{ initials(cert.common_name) }}</span>
                     <span class="cell-text">
-                      <span class="cell-title">{{ cert.common_name }}</span>
+                      <NuxtLink :to="`/certificates/${cert.id}`" class="cell-title cell-link">
+                        {{ cert.common_name }}
+                      </NuxtLink>
                       <span class="cell-sub">
                         {{ cert.sans.length }} SAN{{ cert.sans.length === 1 ? '' : 's' }} ·
                         {{ cert.key_algorithm }}
@@ -310,14 +354,9 @@ const hasFilters = computed(
                     title="Auto-renew is on"
                   />
                 </td>
-                <td class="table-actions" @click.stop>
-                  <NuxtLink
-                    :to="`/certificates/${cert.id}`"
-                    class="btn btn-icon btn-icon-muted"
-                    title="Open"
-                  >
-                    <span class="mdi mdi-chevron-right" />
-                  </NuxtLink>
+                <td class="chevron-col" aria-hidden="true">
+                  <!-- A visual cue only: the name is the link, so this stays out of the tab order. -->
+                  <span class="mdi mdi-chevron-right row-chevron" />
                 </td>
               </tr>
             </tbody>

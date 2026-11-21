@@ -272,6 +272,25 @@ th {
   border-bottom: 1px solid var(--border-primary);
   white-space: nowrap;
 }
+/* A sortable header: a button that still reads as the header text. */
+.th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.th-sort:hover,
+.th-sort.active { color: var(--text-primary); }
+.th-sort-icon { font-size: 13px; opacity: 0.45; }
+.th-sort:hover .th-sort-icon,
+.th-sort.active .th-sort-icon { opacity: 1; }
 td {
   padding: 13px 16px;
   font-size: 14px;
@@ -293,6 +312,11 @@ tbody tr:hover td { background: var(--bg-hover); }
   color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* The link a clickable row carries: styled as the title it replaces. */
+.cell-link { display: block; max-width: 100%; }
+.cell-link:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
+.chevron-col { width: 40px; text-align: right; }
+.row-chevron { font-size: 18px; color: var(--text-muted); vertical-align: middle; }
 .cell-sub {
   font-size: 12.5px;
   color: var(--text-muted);
@@ -391,6 +415,18 @@ tbody tr:hover td { background: var(--bg-hover); }
   transition: background var(--transition-slow), border-color var(--transition-slow), transform var(--transition);
 }
 .stat-card:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+
+/* A card whose label link covers it, so the whole card is the click target
+   while only the label is in the tab order. Links inside the card sit above. */
+.stat-card-link { position: relative; }
+.stat-card-link:hover { border-color: var(--border-focus, var(--primary-500)); }
+.stat-card-link:focus-within { outline: 2px solid var(--primary-500); outline-offset: 2px; }
+.stat-link,
+.stat-link:hover { color: var(--text-muted); }
+.stat-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.stat-link:focus-visible { outline: none; }
+.stat-sub-link { position: relative; z-index: 1; color: inherit; }
+.stat-sub-link:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
 .stat-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .stat-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 .stat-value { font-size: 28px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }

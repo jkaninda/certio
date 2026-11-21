@@ -28,6 +28,7 @@ import type { Authority, Certificate, TrustGuide } from '~/types/api'
 
 const route = useRoute()
 const api = useApi()
+const { openRow } = useRowLink()
 const auth = useAuthStore()
 const catalog = useCatalogStore()
 const toast = useToast()
@@ -311,9 +312,13 @@ function downloadRoot() {
                 v-for="cert in certificates"
                 :key="cert.id"
                 class="row-clickable"
-                @click="navigateTo(`/certificates/${cert.id}`)"
+                @click="openRow($event, `/certificates/${cert.id}`)"
               >
-                <td class="cell-title">{{ cert.common_name }}</td>
+                <td>
+                  <NuxtLink :to="`/certificates/${cert.id}`" class="cell-title cell-link">
+                    {{ cert.common_name }}
+                  </NuxtLink>
+                </td>
                 <td><span class="badge badge-secondary">{{ cert.profile }}</span></td>
                 <td class="text-sm">{{ date(cert.not_after) }} <span class="text-muted">({{ days(cert.days_remaining) }})</span></td>
                 <td><span class="badge badge-dot" :class="statusClass(cert.status)">{{ cert.status }}</span></td>
