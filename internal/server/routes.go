@@ -124,9 +124,9 @@ func (s *Server) systemRoutes(g groups) []okapi.RouteDefinition {
 	// has no typed request or response to describe.
 	s.app.HandleHTTP(http.MethodGet, "/metrics", s.metrics.Handler(),
 		okapi.DocSummary("Prometheus metrics"),
-		okapi.DocDescription("Certificate and CA expiry timestamps, issuance, renewal, "+
+		okapi.Description("Certificate and CA expiry timestamps, issuance, renewal, "+
 			"revocation, notification and deployment counters, plus Go runtime series."),
-		okapi.DocTags(tagSystem),
+		okapi.Tags(tagSystem),
 	)
 
 	return []okapi.RouteDefinition{
@@ -251,8 +251,8 @@ func (s *Server) authRoutes(g groups) []okapi.RouteDefinition {
 			Request:  &dto.LoginRequest{},
 			Response: &dto.LoginResponse{},
 			Options: []okapi.RouteOption{
-				okapi.DocErrorResponse(401, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(429, &dto.ErrorResponse{}),
+				okapi.DocResponse(401, &dto.ErrorResponse{}),
+				okapi.DocResponse(429, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -266,8 +266,8 @@ func (s *Server) authRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.TwoFactorVerifyRequest{},
 			Response:    &dto.LoginResponse{},
 			Options: []okapi.RouteOption{
-				okapi.DocErrorResponse(401, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(429, &dto.ErrorResponse{}),
+				okapi.DocResponse(401, &dto.ErrorResponse{}),
+				okapi.DocResponse(429, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -278,7 +278,7 @@ func (s *Server) authRoutes(g groups) []okapi.RouteDefinition {
 			Summary:  "Exchange a refresh token for a new pair",
 			Request:  &dto.RefreshRequest{},
 			Response: &dto.TokenResponse{},
-			Options:  []okapi.RouteOption{okapi.DocErrorResponse(401, &dto.ErrorResponse{})},
+			Options:  []okapi.RouteOption{okapi.DocResponse(401, &dto.ErrorResponse{})},
 		},
 		{
 			Method:  http.MethodPost,
@@ -330,8 +330,8 @@ func (s *Server) twoFactorRoutes(g groups) []okapi.RouteDefinition {
 				"abandoned setup cannot lock the account out. Calling it again replaces the pending secret.",
 			Response: &dto.TwoFactorSetupResponse{},
 			Options: []okapi.RouteOption{
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(403, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(403, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -344,7 +344,7 @@ func (s *Server) twoFactorRoutes(g groups) []okapi.RouteDefinition {
 			Description: "The recovery codes are returned exactly once; only their digests are stored.",
 			Request:     &dto.TwoFactorCodeRequest{},
 			Response:    &dto.RecoveryCodesResponse{},
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(401, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(401, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPost,
@@ -356,7 +356,7 @@ func (s *Server) twoFactorRoutes(g groups) []okapi.RouteDefinition {
 			Description: "Requires the account password as well as a current code.",
 			Request:     &dto.TwoFactorDisableRequest{},
 			Response:    &dto.MessageResponse{},
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(401, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(401, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPost,
@@ -368,7 +368,7 @@ func (s *Server) twoFactorRoutes(g groups) []okapi.RouteDefinition {
 			Description: "Every previously issued code stops working.",
 			Request:     &dto.TwoFactorCodeRequest{},
 			Response:    &dto.RecoveryCodesResponse{},
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(401, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(401, &dto.ErrorResponse{})},
 		},
 	}
 }
@@ -403,7 +403,7 @@ func (s *Server) oauthRoutes(g groups) []okapi.RouteDefinition {
 			Description: "Mints the CSRF state and the PKCE verifier server-side and returns a 302. " +
 				"Neither the verifier nor anything derived from it beyond the S256 challenge reaches " +
 				"the browser, so an intercepted authorization code is not enough to complete a sign-in.",
-			Options: []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+			Options: []okapi.RouteOption{okapi.DocResponse(404, &dto.ErrorResponse{})},
 		},
 		{
 			Method:  http.MethodPost,
@@ -418,9 +418,9 @@ func (s *Server) oauthRoutes(g groups) []okapi.RouteDefinition {
 			Request:  &dto.OAuthCallbackRequest{},
 			Response: &dto.LoginResponse{},
 			Options: []okapi.RouteOption{
-				okapi.DocErrorResponse(401, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(403, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(404, &dto.ErrorResponse{}),
+				okapi.DocResponse(401, &dto.ErrorResponse{}),
+				okapi.DocResponse(403, &dto.ErrorResponse{}),
+				okapi.DocResponse(404, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -433,7 +433,7 @@ func (s *Server) oauthRoutes(g groups) []okapi.RouteDefinition {
 			Description: "The client secret is sealed with the master key and is never returned.",
 			Response:    &dto.OAuthProviderResponse{},
 			Middlewares: read,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(404, &dto.ErrorResponse{})},
 		},
 		{
 			Method:  http.MethodPut,
@@ -448,7 +448,7 @@ func (s *Server) oauthRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.SaveOAuthProviderRequest{},
 			Response:    &dto.OAuthProviderResponse{},
 			Middlewares: admin,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(400, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(400, &dto.ErrorResponse{})},
 		},
 		{
 			Method:  http.MethodDelete,
@@ -499,8 +499,8 @@ func (s *Server) authorityRoutes(g groups) []okapi.RouteDefinition {
 			Middlewares: write,
 			Options: []okapi.RouteOption{
 				okapi.DocResponse(201, &dto.AuthorityResponse{}),
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(403, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(403, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -515,8 +515,8 @@ func (s *Server) authorityRoutes(g groups) []okapi.RouteDefinition {
 			Middlewares: write,
 			Options: []okapi.RouteOption{
 				okapi.DocResponse(201, &dto.AuthorityResponse{}),
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(409, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(409, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -529,7 +529,7 @@ func (s *Server) authorityRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.AuthorityRefRequest{},
 			Response:    &dto.AuthorityResponse{},
 			Middlewares: read,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(404, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPatch,
@@ -554,7 +554,7 @@ func (s *Server) authorityRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.DeleteAuthorityRequest{},
 			Response:    &dto.MessageResponse{},
 			Middlewares: admin,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(409, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(409, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPost,
@@ -647,8 +647,8 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 			Middlewares: issue,
 			Options: []okapi.RouteOption{
 				okapi.DocResponse(201, &dto.IssueCertificateResponse{}),
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
-				okapi.DocErrorResponse(428, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(428, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -663,7 +663,7 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 			Middlewares: issue,
 			Options: []okapi.RouteOption{
 				okapi.DocResponse(201, &dto.IssueCertificateResponse{}),
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
 			},
 		},
 		{
@@ -676,7 +676,7 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 			Description: "Accepts a certificate, a full chain, a CSR, a private key or a CRL.",
 			Request:     &dto.InspectRequest{},
 			Middlewares: read,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(400, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(400, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPost,
@@ -712,7 +712,7 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.CertificateRefRequest{},
 			Response:    &dto.CertificateResponse{},
 			Middlewares: read,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(404, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(404, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodPatch,
@@ -761,7 +761,7 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.RevokeCertificateRequest{},
 			Response:    &dto.RevokeCertificateResponse{},
 			Middlewares: write,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(409, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(409, &dto.ErrorResponse{})},
 		},
 		{
 			Method:  http.MethodGet,
@@ -774,7 +774,7 @@ func (s *Server) certificateRoutes(g groups) []okapi.RouteDefinition {
 				"download policy and are always audited.",
 			Request:     &dto.DownloadCertificateRequest{},
 			Middlewares: read,
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(403, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(403, &dto.ErrorResponse{})},
 		},
 		{
 			Method:      http.MethodGet,
@@ -925,7 +925,7 @@ func (s *Server) tokenRoutes(g groups) []okapi.RouteDefinition {
 			Request:     &dto.TokenRefRequest{},
 			Response:    &dto.MessageResponse{},
 			Middlewares: middleware.Read(service.ScopeTokensWrite),
-			Options:     []okapi.RouteOption{okapi.DocErrorResponse(403, &dto.ErrorResponse{})},
+			Options:     []okapi.RouteOption{okapi.DocResponse(403, &dto.ErrorResponse{})},
 		},
 	}
 }
@@ -1029,7 +1029,7 @@ func (s *Server) deploymentRoutes(g groups) []okapi.RouteDefinition {
 			Middlewares: write,
 			Options: []okapi.RouteOption{
 				okapi.DocResponse(201, &dto.DeploymentResponse{}),
-				okapi.DocErrorResponse(400, &dto.ErrorResponse{}),
+				okapi.DocResponse(400, &dto.ErrorResponse{}),
 			},
 		},
 		{
