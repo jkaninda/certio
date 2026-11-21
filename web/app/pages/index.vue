@@ -96,18 +96,20 @@ function severityClassFor(severity: string) {
 
       <template v-else>
         <div class="stats-grid">
-          <div class="stat-card">
+          <!-- Each card opens the list behind its number: the label is the link,
+               stretched over the card. -->
+          <div class="stat-card stat-card-link">
             <div class="stat-header">
-              <span class="stat-label">Certificates</span>
+              <NuxtLink to="/certificates" class="stat-label stat-link">Certificates</NuxtLink>
               <span class="stat-icon stat-icon-primary mdi mdi-file-certificate-outline" />
             </div>
             <div class="stat-value">{{ stats.certificates.total }}</div>
             <div class="stat-sub">{{ stats.certificates.active }} active</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card stat-card-link">
             <div class="stat-header">
-              <span class="stat-label">Needs attention</span>
+              <NuxtLink to="/certificates?status=expiring" class="stat-label stat-link">Needs attention</NuxtLink>
               <span
                 class="stat-icon mdi mdi-clock-alert-outline"
                 :class="needsAttention > 0 ? 'stat-icon-warning' : 'stat-icon-secondary'"
@@ -115,22 +117,28 @@ function severityClassFor(severity: string) {
             </div>
             <div class="stat-value">{{ needsAttention }}</div>
             <div class="stat-sub">
-              {{ stats.certificates.expiring }} expiring · {{ stats.certificates.expired }} expired
+              <NuxtLink to="/certificates?status=expiring" class="stat-sub-link">
+                {{ stats.certificates.expiring }} expiring
+              </NuxtLink>
+              ·
+              <NuxtLink to="/certificates?status=expired" class="stat-sub-link">
+                {{ stats.certificates.expired }} expired
+              </NuxtLink>
             </div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card stat-card-link">
             <div class="stat-header">
-              <span class="stat-label">Authorities</span>
+              <NuxtLink to="/authorities" class="stat-label stat-link">Authorities</NuxtLink>
               <span class="stat-icon stat-icon-secondary mdi mdi-certificate-outline" />
             </div>
             <div class="stat-value">{{ stats.authorities.total }}</div>
             <div class="stat-sub">{{ stats.authorities.active }} active</div>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card stat-card-link">
             <div class="stat-header">
-              <span class="stat-label">Revoked</span>
+              <NuxtLink to="/certificates?status=revoked" class="stat-label stat-link">Revoked</NuxtLink>
               <span
                 class="stat-icon mdi mdi-close-octagon-outline"
                 :class="stats.revocations > 0 ? 'stat-icon-danger' : 'stat-icon-secondary'"

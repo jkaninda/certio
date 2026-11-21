@@ -20,6 +20,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { NuxtLink } from '#components'
 import { useAuthStore } from '~/stores/auth'
 import { useThemeStore } from '~/stores/theme'
 import { useCatalogStore } from '~/stores/catalog'
@@ -227,21 +228,25 @@ const activeAuthorityLabel = computed(() => {
       <nav class="sidebar-nav">
         <div v-for="section in visibleSections" :key="section.id" class="nav-section">
           <p v-if="!sidebarCollapsed" class="nav-section-title">{{ section.title }}</p>
-          <a
+          <!-- Real links, so they take keyboard focus and open in a new tab. -->
+          <component
+            :is="item.external ? 'a' : NuxtLink"
             v-for="item in section.items"
             :key="item.path"
             v-bind="item.external
               ? { href: item.path, target: '_blank', rel: 'noopener noreferrer' }
-              : {}"
+              : { to: item.path }"
             class="nav-item"
             :class="{ active: !item.external && isActive(item) }"
+            :aria-current="!item.external && isActive(item) ? 'page' : undefined"
+            :aria-label="sidebarCollapsed ? item.name : undefined"
             :title="sidebarCollapsed ? item.name : undefined"
-            @click="!item.external && (mobileOpen = false, navigateTo(item.path))"
+            @click="mobileOpen = false"
           >
-            <span class="nav-icon mdi" :class="`mdi-${item.icon}`" />
+            <span class="nav-icon mdi" :class="`mdi-${item.icon}`" aria-hidden="true" />
             <span v-if="!sidebarCollapsed" class="nav-label">{{ item.name }}</span>
-            <span v-if="!sidebarCollapsed && item.external" class="mdi mdi-open-in-new nav-external" />
-          </a>
+            <span v-if="!sidebarCollapsed && item.external" class="mdi mdi-open-in-new nav-external" aria-hidden="true" />
+          </component>
         </div>
       </nav>
 
